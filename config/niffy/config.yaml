@@ -1,0 +1,189 @@
+version: v0.3
+
+# Niffy development Recipe: all credentials are resolved from environment variables.
+
+listeners:
+  - name: niffy-http
+    address: 0.0.0.0
+    port: 8899
+    timeout: 300s
+
+global:
+  router:
+    auto_model_names:
+      - niffy/auto
+      - vllm-sr/auto
+
+providers:
+  defaults:
+    # Unmatched and simple requests use the least-expensive model.
+    default_model: niffy-cheap
+    default_reasoning_effort: medium
+    reasoning_families:
+      openai:
+        type: reasoning_effort
+        parameter: reasoning_effort
+
+  models:
+    - name: niffy-cheap
+      provider_model_id: mistral-small-latest
+      api_format: openai
+      pricing:
+        currency: USD
+        prompt_per_1m: 0.15
+        cached_input_per_1m: 0.015
+        completion_per_1m: 0.60
+      backend_refs:
+        - name: mistral
+          base_url: https://api.mistral.ai/v1
+          # Mistral exposes an OpenAI-compatible Chat Completions API.
+          provider: openai
+          type: openai
+          auth_header: Authorization
+          auth_prefix: Bearer
+          api_key_env: MISTRAL_API_KEY
+          weight: 100
+
+    - name: niffy-general
+      provider_model_id: grok-4.3
+      api_format: openai
+      pricing:
+        currency: USD
+        prompt_per_1m: 1.25
+        cached_input_per_1m: 0.20
+        completion_per_1m: 2.50
+      backend_refs:
+        - name: xai
+          base_url: https://api.x.ai/v1
+          # xAI exposes an OpenAI-compatible Chat Completions API.
+          provider: openai
+          type: openai
+          auth_header: Authorization
+          auth_prefix: Bearer
+          api_key_env: XAI_API_KEY
+          weight: 100
+
+    - name: niffy-reasoning
+      reasoning_family: openai
+      provider_model_id: gpt-5.6-terra
+      api_format: openai
+      pricing:
+        currency: USD
+        prompt_per_1m: 2.00
+        cached_input_per_1m: 0.20
+        completion_per_1m: 12.00
+      backend_refs:
+        - name: openai
+          base_url: https://api.openai.com/v1
+          provider: openai
+          type: openai
+          auth_header: Authorization
+          auth_prefix: Bearer
+          api_key_env: OPENAI_API_KEY
+          weight: 100
+
+routing:
+  strategy: priority
+
+  modelCards:
+    - name: niffy-cheap
+      description: Economical default for direct questions, summaries, and routine chat.
+      capabilities: [chat, text, summarization]
+      modality: text
+      tags: [provider:mistral, tier:cheap]
+    - name: niffy-general
+      description: General model selected when a request indicates live-search or tool intent.
+      capabilities: [chat, text, tool-use]
+      modality: text
+      tags: [provider:xai, tier:general]
+    - name: niffy-reasoning
+      description: Higher-cost model reserved for complex analysis and reasoning.
+      capabilities: [chat, text, reasoning, code]
+      modality: text
+      tags: [provider:openai, tier:reasoning]
+
+  signals:
+    keywords:
+      - name: tool_intent
+        operator: OR
+        case_sensitive: false
+        keywords:
+          - search the web
+          - web search
+          - browse the web
+          - look online
+          - find online
+          - latest news
+          - current news
+          - current information
+          - up-to-date
+          - real-time
+          - realtime
+          - use a tool
+          - call a tool
+          - use mcp
+          - mcp server
+
+      - name: reasoning_intent
+        operator: OR
+        case_sensitive: false
+        keywords:
+          - analyze
+          - reason through
+          - step by step
+          - prove
+          - derive
+          - calculate
+          - debug
+          - root cause
+          - design an architecture
+          - trade-off
+          - tradeoff
+          - compare approaches
+          - optimize
+          - multi-step
+          - implementation plan
+
+  decisions:
+    # Tool intent has the highest priority so phrases such as "analyze the
+    # latest news" select the provider intended for live-information work.
+    - name: tool-intent-route
+      description: Select Grok for requests that indicate search, freshness, or tool use.
+      priority: 300
+      rules:
+        operator: AND
+        conditions:
+          - type: keyword
+            name: tool_intent
+      modelRefs:
+        - model: niffy-general
+          use_reasoning: false
+      algorithm:
+        type: static
+
+    - name: reasoning-route
+      description: Select OpenAI for requests likely to need deliberate reasoning.
+      priority: 200
+      rules:
+        operator: AND
+        conditions:
+          - type: keyword
+            name: reasoning_intent
+      modelRefs:
+        - model: niffy-reasoning
+          use_reasoning: true
+          reasoning_effort: medium
+      algorithm:
+        type: static
+
+    - name: economical-default-route
+      description: Select Mistral for all requests not matched by a more specific route.
+      priority: 100
+      rules:
+        operator: AND
+        conditions: []
+      modelRefs:
+        - model: niffy-cheap
+          use_reasoning: false
+      algorithm:
+        type: static

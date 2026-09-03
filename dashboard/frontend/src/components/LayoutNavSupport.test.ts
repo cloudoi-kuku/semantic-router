@@ -38,4 +38,17 @@ describe('layout navigation route matching', () => {
     })
     expect(models?.items.indexOf(entrypoints!)).toBe(1)
   })
+
+  it('places the Route Inspector in the routing outcomes workspace', () => {
+    const inspectItems = BUILD_MENU_CATEGORIES.find(
+      (category) => category.key === 'outcomes',
+    )?.sections.find((section) => section.title === 'Inspect')?.items
+
+    expect(inspectItems).toContainEqual({
+      kind: 'route',
+      label: 'Route Inspector',
+      icon: 'decision',
+      to: '/route-inspector',
+    })
+  })
 })

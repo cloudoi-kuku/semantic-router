@@ -63,6 +63,12 @@ describe('config write access', () => {
       true,
     )
     expect(canAccessDashboardPath({ permissions: ['evaluation.read'] }, '/evaluation')).toBe(true)
+    expect(canAccessDashboardPath({ permissions: ['evaluation.run'] }, '/route-inspector')).toBe(
+      true,
+    )
+    expect(canAccessDashboardPath({ permissions: ['evaluation.read'] }, '/route-inspector')).toBe(
+      false,
+    )
     expect(canAccessDashboardPath({ permissions: ['mcp.read'] }, '/config/mcp')).toBe(true)
     expect(canAccessDashboardPath({ permissions: ['config.read'] }, '/config/mcp')).toBe(false)
     expect(canAccessDashboardPath({ role: 'read' }, '/topology')).toBe(true)

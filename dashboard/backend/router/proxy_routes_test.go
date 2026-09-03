@@ -107,6 +107,50 @@ func TestRouterOutcomeProxyUsesServiceCredential(t *testing.T) {
 	}
 }
 
+func TestRouteInspectorProxyForwardsOnlyThroughManagedRouterIdentity(t *testing.T) {
+	var authorization string
+	var path string
+	var trace string
+	var cookie string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		authorization = r.Header.Get("Authorization")
+		path = r.URL.Path
+		trace = r.URL.Query().Get("trace")
+		cookie = r.Header.Get("Cookie")
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"schema_version":"vllm-sr/routing-decision/v1alpha1","dry_run":true}`))
+	}))
+	defer server.Close()
+
+	mux := http.NewServeMux()
+	registerRouterAPIProxy(
+		mux,
+		&config.Config{RouterAPIURL: server.URL},
+		nil,
+		routerProxyCredentialProvider{token: "router-service-token"},
+	)
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/api/router/api/v1/route/evaluate?trace=true",
+		strings.NewReader(`{"model":"niffy/auto","text":"inspect this"}`),
+	)
+	req.Header.Set("Authorization", "Bearer dashboard-user-jwt")
+	req.Header.Set("Cookie", "vsr_session=cookie-user-jwt")
+	recorder := httptest.NewRecorder()
+
+	mux.ServeHTTP(recorder, req)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusOK)
+	}
+	if path != "/api/v1/route/evaluate" || trace != "true" {
+		t.Fatalf("upstream target = %q?trace=%s", path, trace)
+	}
+	if authorization != "Bearer router-service-token" || cookie != "" {
+		t.Fatalf("unexpected forwarded identity: authorization=%q cookie=%q", authorization, cookie)
+	}
+}
+
 func TestRouterAPIProxyRejectsUnknownManagementMutation(t *testing.T) {
 	var calls int
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -143,6 +187,8 @@ func TestRouterManagementProxyAllowlistMatchesDashboardSurfaces(t *testing.T) {
 		want   bool
 	}{
 		{method: http.MethodGet, path: "/api/router/v1/models", want: true},
+		{method: http.MethodPost, path: "/api/router/api/v1/route/evaluate", want: true},
+		{method: http.MethodGet, path: "/api/router/api/v1/route/evaluate", want: false},
 		{method: http.MethodGet, path: "/api/router/v1/router_replay", want: true},
 		{method: http.MethodGet, path: "/api/router/v1/router_replay/replay-1", want: true},
 		{method: http.MethodHead, path: "/api/router/v1/router_replay", want: false},

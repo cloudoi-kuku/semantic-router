@@ -185,9 +185,10 @@ func TestOfficialResponseFieldInventoriesAreClosed(t *testing.T) {
 
 func TestOfficialUsageFieldInventoriesAreClosed(t *testing.T) {
 	tests := []struct {
-		name     string
-		wire     any
-		official []string
+		name       string
+		wire       any
+		official   []string
+		extensions []string
 	}{
 		{
 			name: "OpenAI Chat Completions",
@@ -196,6 +197,7 @@ func TestOfficialUsageFieldInventoriesAreClosed(t *testing.T) {
 				"completion_tokens", "completion_tokens_details", "compute_units", "prompt_tokens",
 				"prompt_tokens_details", "total_tokens",
 			),
+			extensions: fields("cost_in_usd_ticks", "num_sources_used", "service_tier"),
 		},
 		{
 			name: "OpenAI Responses",
@@ -217,8 +219,10 @@ func TestOfficialUsageFieldInventoriesAreClosed(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			if got := jsonFieldNames(reflect.TypeOf(test.wire)); !reflect.DeepEqual(got, test.official) {
-				t.Fatalf("usage field inventory drifted\n got: %v\nwant: %v", got, test.official)
+			want := append(append([]string(nil), test.official...), test.extensions...)
+			sort.Strings(want)
+			if got := jsonFieldNames(reflect.TypeOf(test.wire)); !reflect.DeepEqual(got, want) {
+				t.Fatalf("usage field inventory drifted\n got: %v\nwant: %v", got, want)
 			}
 		})
 	}

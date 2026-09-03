@@ -134,6 +134,9 @@ type chatUsageWire struct {
 	CompletionTokens        int64                            `json:"completion_tokens"`
 	TotalTokens             int64                            `json:"total_tokens"`
 	ComputeUnits            json.RawMessage                  `json:"compute_units,omitempty"`
+	ServiceTier             *string                          `json:"service_tier,omitempty"`
+	CostInUSDTicks          *int64                           `json:"cost_in_usd_ticks,omitempty"`
+	NumSourcesUsed          *int64                           `json:"num_sources_used,omitempty"`
 	PromptTokensDetails     *chatPromptTokensDetailsWire     `json:"prompt_tokens_details,omitempty"`
 	CompletionTokensDetails *chatCompletionTokensDetailsWire `json:"completion_tokens_details,omitempty"`
 }

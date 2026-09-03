@@ -85,6 +85,7 @@ curl -sS http://localhost:8080/api/v1/classify/intent \
 | `POST` | `/api/v1/classify/combined` | Run intent, PII, and security classification |
 | `POST` | `/api/v1/classify/batch` | Run a selected classifier over a batch |
 | `POST` | `/api/v1/eval` | Evaluate all configured signals |
+| `POST` | `/api/v1/route/evaluate` | Preview the live routing decision without invoking a model or tool |
 | `POST` | `/api/v1/nli` | Evaluate a premise/hypothesis pair |
 | `POST` | `/api/v1/embeddings` | Generate configured text or image embeddings |
 | `POST` | `/api/v1/similarity` | Compare a text pair |

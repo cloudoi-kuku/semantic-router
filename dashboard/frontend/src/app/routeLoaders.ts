@@ -16,6 +16,7 @@ export const loadMonitoringPage = () => import('../pages/MonitoringPage')
 export const loadOpenClawPage = () => import('../pages/OpenClawPage')
 export const loadPlaygroundFullscreenPage = () => import('../pages/PlaygroundFullscreenPage')
 export const loadPlaygroundPage = () => import('../pages/PlaygroundPage')
+export const loadRouteInspectorPage = () => import('../pages/RouteInspectorPage')
 export const loadSetupWizardPage = () => import('../pages/SetupWizardPage')
 export const loadStatusPage = () => import('../pages/StatusPage')
 export const loadTaxonomyPage = () => import('../pages/TaxonomyPage')
@@ -34,6 +35,7 @@ const routeLoaders: Array<{ matches: (pathname: string) => boolean; load: RouteL
     load: loadPlaygroundFullscreenPage,
   },
   { matches: (pathname) => pathname.startsWith('/playground'), load: loadPlaygroundPage },
+  { matches: (pathname) => pathname.startsWith('/route-inspector'), load: loadRouteInspectorPage },
   { matches: (pathname) => pathname.startsWith('/builder'), load: loadBuilderPage },
   { matches: (pathname) => pathname.startsWith('/config'), load: loadConfigPage },
   {

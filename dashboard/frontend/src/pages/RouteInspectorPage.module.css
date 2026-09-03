@@ -1,0 +1,312 @@
+.container {
+  width: min(1180px, 100%);
+  margin: 0 auto;
+  padding: clamp(1.15rem, 2vw, 1.7rem) clamp(1rem, 2vw, 1.4rem) 3rem;
+  display: grid;
+  gap: 1rem;
+}
+
+.masthead {
+  display: flex;
+  min-height: 150px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2rem;
+  padding: 1.6rem 1.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background:
+    radial-gradient(circle at 84% 15%, rgba(56, 189, 248, 0.12), transparent 30%),
+    linear-gradient(140deg, #111216, #0b0c0f);
+}
+
+.masthead h1 {
+  margin: 0.25rem 0 0;
+  font-size: clamp(2rem, 4vw, 2.75rem);
+  letter-spacing: -0.05em;
+}
+
+.masthead p {
+  margin: 0.45rem 0 0;
+  color: var(--color-text-muted);
+}
+
+.eyebrow,
+.panelHeading span,
+.field > span,
+.explanation > span {
+  color: var(--color-text-muted);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.noCostBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.55rem 0.8rem;
+  border: 1px solid rgba(52, 211, 153, 0.25);
+  border-radius: 999px;
+  background: rgba(16, 185, 129, 0.08);
+  color: #a7f3d0;
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.noCostBadge svg,
+.evaluateButton svg,
+.emptyState svg {
+  width: 17px;
+  height: 17px;
+}
+
+.workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+.formPanel,
+.resultPanel {
+  min-width: 0;
+  padding: 1.15rem;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--surface-panel);
+}
+
+.formPanel {
+  display: grid;
+  gap: 1rem;
+}
+
+.resultPanel {
+  min-height: 430px;
+}
+
+.panelHeading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-bottom: 0.9rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.panelHeading h2 {
+  margin: 0.15rem 0 0;
+  font-size: 1.05rem;
+}
+
+.privacyLabel,
+.schemaBadge {
+  max-width: 220px;
+  padding: 0.28rem 0.48rem;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.05);
+  font-family: var(--font-mono);
+  font-size: 0.64rem !important;
+  letter-spacing: 0 !important;
+  text-align: right;
+  text-transform: none !important;
+}
+
+.field {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.field input,
+.field textarea {
+  width: 100%;
+}
+
+.field textarea {
+  resize: vertical;
+}
+
+.traceToggle {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  color: var(--color-text-secondary);
+  font-size: 0.8rem;
+}
+
+.traceToggle input {
+  width: 16px;
+  height: 16px;
+}
+
+.evaluateButton {
+  display: inline-flex;
+  min-height: var(--control-height);
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: var(--control-radius);
+  background: var(--action-primary-bg);
+  color: #09090a;
+  font-weight: 700;
+}
+
+.evaluateButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.emptyState {
+  min-height: 330px;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 0.35rem;
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+.emptyState svg {
+  width: 28px;
+  height: 28px;
+  margin-bottom: 0.4rem;
+}
+
+.emptyState strong {
+  color: var(--color-text-secondary);
+}
+
+.resultBody {
+  display: grid;
+  gap: 1rem;
+  padding-top: 1rem;
+}
+
+.decisionGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+
+.decisionGrid > div,
+.explanation,
+.signalSection,
+.tracePanel {
+  padding: 0.8rem;
+  border: 1px solid var(--color-border);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.018);
+}
+
+.decisionGrid dt {
+  color: var(--color-text-muted);
+  font-size: 0.67rem;
+}
+
+.decisionGrid dd {
+  margin: 0.18rem 0 0;
+  overflow-wrap: anywhere;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+}
+
+.explanation p,
+.muted {
+  margin: 0.35rem 0 0;
+  color: var(--color-text-secondary);
+  font-size: 0.8rem;
+}
+
+.signalSection h3 {
+  margin: 0 0 0.6rem;
+  font-size: 0.82rem;
+}
+
+.signalList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.usedSignal,
+.matchedSignal {
+  padding: 0.28rem 0.5rem;
+  border-radius: 999px;
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+}
+
+.usedSignal {
+  background: rgba(52, 211, 153, 0.12);
+  color: #a7f3d0;
+}
+
+.matchedSignal {
+  background: rgba(96, 165, 250, 0.12);
+  color: #bfdbfe;
+}
+
+.tracePanel summary {
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 650;
+}
+
+.traceList {
+  display: grid;
+  gap: 0.45rem;
+  margin-top: 0.7rem;
+}
+
+.traceList > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 0.7rem;
+  color: var(--color-text-secondary);
+  font-size: 0.7rem;
+}
+
+.traceList small {
+  color: var(--color-text-muted);
+}
+
+.error {
+  margin-top: 1rem;
+  padding: 0.8rem;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 7px;
+  background: rgba(239, 68, 68, 0.08);
+  color: #fecaca;
+  font-size: 0.8rem;
+}
+
+@media (max-width: 840px) {
+  .workspace {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .masthead {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 1rem;
+  }
+}
+
+@media (max-width: 520px) {
+  .decisionGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .panelHeading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .privacyLabel,
+  .schemaBadge {
+    max-width: 100%;
+    text-align: left;
+  }
+}

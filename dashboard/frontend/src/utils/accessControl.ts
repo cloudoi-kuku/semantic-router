@@ -101,6 +101,9 @@ export function canAccessDashboardPath(
   if (normalizedPath.startsWith('/evaluation')) {
     return canAccessWithPermission(user, EVALUATION_READ_PERMISSION, READ_CAPABLE_ROLES)
   }
+  if (normalizedPath.startsWith('/route-inspector')) {
+    return canAccessWithPermission(user, EVALUATION_RUN_PERMISSION)
+  }
   if (normalizedPath.startsWith('/openclaw')) {
     return canAccessWithPermission(user, OPENCLAW_READ_PERMISSION, READ_CAPABLE_ROLES)
   }

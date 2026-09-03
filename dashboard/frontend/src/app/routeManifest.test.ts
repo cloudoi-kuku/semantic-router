@@ -22,6 +22,13 @@ describe('dashboard route manifest', () => {
     })
   })
 
+  it('registers the route inspector as an authenticated shell page', () => {
+    expect(shellRouteDefinitions).toContainEqual({
+      path: '/route-inspector',
+      page: 'route-inspector',
+    })
+  })
+
   it('keeps legacy redirects pointed at canonical dashboard routes', () => {
     expect(redirectRouteDefinitions).toContainEqual({
       path: '/knowledge-bases',

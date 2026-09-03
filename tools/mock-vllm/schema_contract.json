@@ -124,6 +124,11 @@
         "prompt_tokens",
         "prompt_tokens_details",
         "total_tokens"
+      ],
+      "extension_usage_fields": [
+        "cost_in_usd_ticks",
+        "num_sources_used",
+        "service_tier"
       ]
     },
     "openai_responses": {

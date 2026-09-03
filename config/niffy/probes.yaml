@@ -1,0 +1,116 @@
+schema_version: v1
+name: niffy
+description: >
+  Executable routing probes for Niffy's initial cost-oriented three-provider
+  profile. The suite checks normal matches, paraphrases, priority collisions,
+  multi-turn input, and phrases that must remain on the economical fallback.
+routing_assets:
+  yaml: config/niffy/config.yaml
+  dsl: config/niffy/recipe.dsl
+router_eval_endpoint: /api/v1/eval
+evaluation:
+  request_timeout_seconds: 60
+  concurrency: 4
+acceptance:
+  min_probe_pass_rate: 100.0
+  min_decision_pass_rate: 100.0
+coverage:
+  min_signal_assertion_percent: 66.7
+  min_projection_assertion_percent: 0.0
+  min_algorithm_assertion_percent: 100.0
+  min_plugin_assertion_percent: 0.0
+  required_request_shapes: [text, messages]
+  min_tag_counts:
+    language: 3
+    negative: 2
+    collision: 1
+    fallback: 5
+    tools: 4
+    multi_turn: 1
+  min_tag_pass_rate:
+    language: 100.0
+    negative: 100.0
+    collision: 100.0
+    fallback: 100.0
+    tools: 100.0
+    multi_turn: 100.0
+decisions:
+  - id: tool-intent-route
+    expected_decision: tool-intent-route
+    expected_algorithm: static
+    expected_alias: niffy-general
+    expected_signals:
+      keywords: [tool_intent]
+    objective: Route prompts that explicitly require fresh information or tools to Grok.
+    variants:
+      - id: explicit_web_search
+        query: Search the web for the latest news about commercial fusion power.
+        tags: [baseline, tools:web]
+      - id: current_information
+        query: Find current information about this week's major cloud-service outages.
+        tags: [paraphrase, tools:web]
+      - id: explicit_mcp
+        query: Use an MCP server to retrieve the customer record before answering.
+        tags: [baseline, tools:mcp]
+      - id: tool_reasoning_collision
+        query: Analyze the latest news and compare approaches to regulating AI systems.
+        tags: [collision, priority, tools:web]
+      - id: search_messages
+        messages:
+          - role: user
+            content: What information do you have about this product?
+          - role: assistant
+            content: My stored information may be outdated.
+          - role: user
+            content: Browse the web and give me up-to-date details.
+        tags: [multi_turn, shape:messages, tools:web]
+
+  - id: reasoning-route
+    expected_decision: reasoning-route
+    expected_algorithm: static
+    expected_alias: niffy-reasoning
+    expected_signals:
+      keywords: [reasoning_intent]
+    forbidden_signals:
+      keywords: [tool_intent]
+    objective: Reserve OpenAI reasoning for complex work without live-information intent.
+    variants:
+      - id: architecture_tradeoffs
+        query: Analyze the trade-offs in designing a multi-region payment platform.
+        tags: [baseline, architecture]
+      - id: mathematical_derivation
+        query: Derive the quadratic formula step by step and explain each transformation.
+        tags: [baseline, mathematics]
+      - id: root_cause_debugging
+        query: Debug this distributed timeout and develop a root cause investigation plan.
+        tags: [paraphrase, coding]
+      - id: compare_approaches
+        query: Compare approaches for tenant isolation and recommend one with justification.
+        tags: [robustness, design]
+      - id: reasoning_without_search
+        query: Create an implementation plan for migrating this monolith without external research.
+        tags: [negative, boundary]
+
+  - id: economical-default-route
+    expected_decision: economical-default-route
+    expected_algorithm: static
+    expected_alias: niffy-cheap
+    forbidden_signals:
+      keywords: [tool_intent, reasoning_intent]
+    objective: Keep routine requests and incidental language on the cheapest provider.
+    variants:
+      - id: greeting
+        query: Hello, how are you?
+        tags: [baseline, fallback]
+      - id: concise_explanation
+        query: Explain DNS in one short paragraph.
+        tags: [baseline, fallback]
+      - id: summarization
+        query: Summarize this paragraph in two sentences without adding new facts.
+        tags: [baseline, fallback]
+      - id: translation
+        query: Translate "good morning" into French.
+        tags: [language:en, fallback]
+      - id: incidental_today
+        query: I had coffee with a colleague today. Rewrite this as a friendly diary entry.
+        tags: [negative, boundary, fallback]

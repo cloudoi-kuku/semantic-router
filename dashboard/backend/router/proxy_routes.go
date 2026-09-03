@@ -176,6 +176,8 @@ func routerManagementProxyRouteAllowed(method, path string) bool {
 	switch path {
 	case "/api/router/v1/models":
 		return method == http.MethodGet || method == http.MethodHead
+	case "/api/router/api/v1/route/evaluate":
+		return method == http.MethodPost
 	case "/api/router/v1/router/outcomes":
 		return method == http.MethodPost
 	case "/api/router/api/v1/response-cache/capabilities",

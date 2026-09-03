@@ -1,0 +1,17 @@
+schema_version: vllm-sr/recipe-metadata/v1
+id: niffy
+name: Niffy Cost-Aware Routing
+version: 0.1.0
+description: >-
+  Routes routine requests to an economical model, explicit search and tool
+  intent to a general model, and deliberate reasoning to a higher-cost model.
+authors:
+  - name: Niffy Project
+license: Apache-2.0
+tags:
+  - cost
+  - multi-provider
+  - reasoning
+  - tools
+links:
+  source: https://github.com/vllm-project/semantic-router

@@ -30,6 +30,7 @@ import {
   loadOpenClawPage,
   loadPlaygroundFullscreenPage,
   loadPlaygroundPage,
+  loadRouteInspectorPage,
   loadSetupWizardPage,
   loadStatusPage,
   loadTopologyPage,
@@ -60,6 +61,9 @@ const shellPageElements: Record<ShellRoutePage, React.ReactElement> = {
   monitoring: <RecoverableLazyRoute loader={loadMonitoringPage} routeLabel="Monitoring" />,
   openclaw: <RecoverableLazyRoute loader={loadOpenClawPage} routeLabel="OpenClaw" />,
   playground: <RecoverableLazyRoute loader={loadPlaygroundPage} routeLabel="Playground" />,
+  'route-inspector': (
+    <RecoverableLazyRoute loader={loadRouteInspectorPage} routeLabel="Route Inspector" />
+  ),
   status: <RecoverableLazyRoute loader={loadStatusPage} routeLabel="Status" />,
   topology: <RecoverableLazyRoute loader={loadTopologyPage} routeLabel="Topology" />,
   tracing: <RecoverableLazyRoute loader={loadTracingPage} routeLabel="Tracing" />,

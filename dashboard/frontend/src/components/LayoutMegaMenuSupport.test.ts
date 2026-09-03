@@ -17,7 +17,7 @@ describe('layout mega-menu geometry', () => {
 
     expect(getLayoutMegaMenuGeometry(outcomes)).toEqual({
       density: 'compact',
-      itemCount: 3,
+      itemCount: 4,
       sectionCount: 3,
     })
   })

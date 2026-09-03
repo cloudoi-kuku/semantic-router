@@ -2,6 +2,7 @@ package protocolcodec
 
 import (
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/vllm-project/semantic-router/src/semantic-router/pkg/llmprotocol"
@@ -56,6 +57,9 @@ func decodeChatResponseUsage(
 	}
 	response.Usage = decodeChatUsage(*wire)
 	appendProviderFieldOmissions(diagnostics, policy, llmprotocol.OpenAIChatV1, map[string]bool{
+		"usage.cost_in_usd_ticks":                                    wire.CostInUSDTicks != nil,
+		"usage.num_sources_used":                                     wire.NumSourcesUsed != nil,
+		"usage.service_tier":                                         wire.ServiceTier != nil,
 		"usage.compute_units":                                        len(wire.ComputeUnits) > 0,
 		"usage.prompt_tokens_details.audio_tokens":                   wire.PromptTokensDetails != nil && wire.PromptTokensDetails.AudioTokens != 0,
 		"usage.prompt_tokens_details.image_tokens":                   wire.PromptTokensDetails != nil && wire.PromptTokensDetails.ImageTokens != 0,
@@ -167,6 +171,14 @@ func decodeChatUsage(wire chatUsageWire) llmprotocol.Usage {
 	}
 	if wire.CompletionTokensDetails != nil {
 		reasoning := wire.CompletionTokensDetails.ReasoningTokens
+		if chatUsageExcludesReasoningFromCompletion(wire, reasoning) {
+			usage.OutputTotal = llmprotocol.TokenCount{
+				Value: llmprotocol.Int64(wire.TotalTokens - wire.PromptTokens), Provenance: llmprotocol.UsageDerived,
+			}
+			usage.OutputReasoning = authoritative(reasoning)
+			usage.OutputOther = authoritative(wire.CompletionTokens)
+			return usage
+		}
 		other := wire.CompletionTokens - reasoning
 		if reasoning < 0 || wire.CompletionTokens < reasoning {
 			other = -1
@@ -177,6 +189,17 @@ func decodeChatUsage(wire chatUsageWire) llmprotocol.Usage {
 		}
 	}
 	return usage
+}
+
+// Some OpenAI-compatible providers report visible output in completion_tokens
+// while total_tokens also includes hidden reasoning. Recognize that convention
+// only when every authoritative count proves the alternate accounting equation.
+func chatUsageExcludesReasoningFromCompletion(wire chatUsageWire, reasoning int64) bool {
+	if wire.PromptTokens < 0 || wire.CompletionTokens < 0 || reasoning <= wire.CompletionTokens ||
+		wire.TotalTokens < wire.PromptTokens || wire.CompletionTokens > math.MaxInt64-reasoning {
+		return false
+	}
+	return wire.TotalTokens-wire.PromptTokens == wire.CompletionTokens+reasoning
 }
 
 func (OpenAIChatCodec) EncodeResponse(response llmprotocol.Response, envelope llmprotocol.Envelope, policy llmprotocol.Policy) ([]byte, llmprotocol.Diagnostics, error) {

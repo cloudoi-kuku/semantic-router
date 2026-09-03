@@ -230,6 +230,8 @@ func routerPermission(method, path string) (string, bool) {
 		return PermConfigWrite, true
 	case path == "/api/models/verify":
 		return PermEvalRun, true
+	case path == "/api/router/api/v1/route/evaluate" && method == http.MethodPost:
+		return PermEvalRun, true
 	case path == "/api/router/v1/router/outcomes" && method == http.MethodPost:
 		return PermFeedbackSubmit, true
 	case strings.HasPrefix(path, "/api/router/v1/router_replay"):

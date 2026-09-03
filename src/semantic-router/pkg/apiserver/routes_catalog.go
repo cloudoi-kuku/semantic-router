@@ -88,6 +88,12 @@ func apiClassifyRoutes() []apiRoute {
 			jsonBody(),
 		),
 		managedRoute(
+			EndpointMetadata{Path: "/api/v1/route/evaluate", Method: "POST", Description: "Preview the live routing decision without model or tool execution"},
+			routePolicy{Permission: PermClassifyInvoke, Sensitivity: SensitivityOperational},
+			(*ClassificationAPIServer).handleRoutingDecision,
+			jsonBody(),
+		),
+		managedRoute(
 			EndpointMetadata{Path: "/api/v1/nli", Method: "POST", Description: "Natural language inference classification for premise and hypothesis pairs"},
 			routePolicy{Permission: PermClassifyInvoke, Sensitivity: SensitivityOperational},
 			(*ClassificationAPIServer).handleNLIClassification,

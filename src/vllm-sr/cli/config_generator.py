@@ -2,6 +2,7 @@
 
 import ipaddress
 import os
+import tempfile
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -12,6 +13,29 @@ from cli.models import UserConfig
 from cli.utils import get_logger
 
 log = get_logger(__name__)
+
+_PRIVATE_CONFIG_MODE = 0o600
+
+
+def _write_private_text(path: Path, content: str) -> None:
+    """Atomically replace a generated config with owner-only permissions."""
+    descriptor, temporary_name = tempfile.mkstemp(
+        prefix=f".{path.name}.", dir=path.parent
+    )
+    temporary_path = Path(temporary_name)
+    try:
+        os.fchmod(descriptor, _PRIVATE_CONFIG_MODE)
+        with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
+            descriptor = -1
+            stream.write(content)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary_path, path)
+    except Exception:
+        if descriptor >= 0:
+            os.close(descriptor)
+        temporary_path.unlink(missing_ok=True)
+        raise
 
 
 def _uses_shared_anthropic_cluster(model) -> bool:
@@ -313,8 +337,7 @@ def generate_envoy_config_from_user_config(
 
     # Write output
     try:
-        with open(output_path, "w") as f:
-            f.write(rendered)
+        _write_private_text(output_path, rendered)
         if log_summary:
             log.info(f"Generated Envoy config: {output_path}")
     except Exception as e:

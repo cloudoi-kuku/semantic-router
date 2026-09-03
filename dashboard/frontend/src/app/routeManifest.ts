@@ -8,6 +8,7 @@ export type ShellRoutePage =
   | 'monitoring'
   | 'openclaw'
   | 'playground'
+  | 'route-inspector'
   | 'status'
   | 'topology'
   | 'tracing'
@@ -34,6 +35,7 @@ export const shellRouteDefinitions: readonly ShellRouteDefinition[] = [
     hideHeaderOnMobile: true,
     hideAccountControl: true,
   },
+  { path: '/route-inspector', page: 'route-inspector' },
   { path: '/topology', page: 'topology' },
   { path: '/tracing', page: 'tracing' },
   { path: '/status', page: 'status' },

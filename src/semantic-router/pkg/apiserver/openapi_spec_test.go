@@ -194,6 +194,7 @@ func documentedOpenAPIPaths() []string {
 		"/api/v1",
 		"/api/v1/classify/batch",
 		"/api/v1/eval",
+		"/api/v1/route/evaluate",
 		"/api/v1/nli",
 		"/api/v1/embeddings",
 		"/api/v1/similarity/batch",

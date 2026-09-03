@@ -108,6 +108,12 @@ export const BUILD_MENU_CATEGORIES: LayoutMenuCategory[] = [
         items: [
           {
             kind: 'route',
+            label: 'Route Inspector',
+            icon: 'decision',
+            to: '/route-inspector',
+          },
+          {
+            kind: 'route',
             label: 'Insights',
             icon: 'insight',
             to: '/insights',

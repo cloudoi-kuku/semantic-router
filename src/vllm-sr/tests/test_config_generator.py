@@ -1,4 +1,5 @@
 import re
+import stat
 import sys
 from pathlib import Path
 
@@ -9,8 +10,22 @@ CLI_ROOT = Path(__file__).resolve().parents[1]
 if str(CLI_ROOT) not in sys.path:
     sys.path.insert(0, str(CLI_ROOT))
 
-from cli.config_generator import generate_envoy_config_from_user_config  # noqa: E402
+from cli.config_generator import (  # noqa: E402
+    _write_private_text,
+    generate_envoy_config_from_user_config,
+)
 from cli.parser import parse_user_config  # noqa: E402
+
+
+def test_generated_config_write_replaces_permissive_file_privately(tmp_path):
+    output_path = tmp_path / "envoy.yaml"
+    output_path.write_text("old")
+    output_path.chmod(0o666)
+
+    _write_private_text(output_path, "new")
+
+    assert output_path.read_text() == "new"
+    assert stat.S_IMODE(output_path.stat().st_mode) == 0o600
 
 
 def _render_envoy_config(
