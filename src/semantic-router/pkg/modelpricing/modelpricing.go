@@ -10,6 +10,27 @@ type Rates struct {
 	CachedInputPer1M float64
 	CacheWritePer1M  *float64
 	CompletionPer1M  float64
+	ReasoningPer1M   *float64
+}
+
+// Estimate contains conservative pre-execution token bounds. OutputTokens and
+// ReasoningTokens are distinct so providers that price reasoning separately
+// can be represented without confusing estimates with reported actual usage.
+type Estimate struct {
+	InputTokens     int
+	OutputTokens    int
+	ReasoningTokens int
+}
+
+// EstimatedCost prices conservative request bounds before provider execution.
+func EstimatedCost(estimate Estimate, rates Rates) float64 {
+	reasoningRate := rates.CompletionPer1M
+	if rates.ReasoningPer1M != nil {
+		reasoningRate = *rates.ReasoningPer1M
+	}
+	return (float64(maxInt(estimate.InputTokens, 0))*nonNegativeRate(rates.PromptPer1M) +
+		float64(maxInt(estimate.OutputTokens, 0))*nonNegativeRate(rates.CompletionPer1M) +
+		float64(maxInt(estimate.ReasoningTokens, 0))*nonNegativeRate(reasoningRate)) / tokensPerMillion
 }
 
 // IsConfigured reports whether the model has an explicit pricing entry.
@@ -18,7 +39,8 @@ func (r Rates) IsConfigured() bool {
 		r.PromptPer1M != 0 ||
 		r.CachedInputPer1M != 0 ||
 		r.CacheWritePer1M != nil ||
-		r.CompletionPer1M != 0
+		r.CompletionPer1M != 0 ||
+		r.ReasoningPer1M != nil
 }
 
 // EffectiveCacheWritePer1M preserves legacy accounting by using the normal

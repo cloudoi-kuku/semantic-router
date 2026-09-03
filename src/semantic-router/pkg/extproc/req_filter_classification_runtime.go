@@ -300,14 +300,8 @@ func (r *OpenAIRouter) selectDecisionRuntimeModel(
 	if result.Decision.GetFastResponseConfig() != nil {
 		return r.selectFastResponseRuntimeModel(result.Decision, ctx), entropy.ReasoningDecision{}, nil
 	}
-	if ineligible := r.contextIneligibleAlgorithmModelCount(result.Decision, ctx.VSRContextTokenCount); ineligible > 0 {
-		return "", entropy.ReasoningDecision{}, fmt.Errorf(
-			"%w: decision %q requires %d request tokens but %d explicitly configured algorithm model(s) have smaller context windows",
-			errNoContextEligibleDecisionModel,
-			decisionName,
-			ctx.VSRContextTokenCount,
-			ineligible,
-		)
+	if err := r.validateRuntimeExplicitAlgorithmModels(result.Decision, decisionName, ctx); err != nil {
+		return "", entropy.ReasoningDecision{}, err
 	}
 	if len(result.Decision.ModelRefs) == 0 {
 		return r.selectDecisionDefaultRuntimeModel(result.Decision, decisionName, ctx)
@@ -316,8 +310,15 @@ func (r *OpenAIRouter) selectDecisionRuntimeModel(
 	eligibleModelRefs, err := r.contextEligibleDecisionModelRefs(
 		result.Decision.ModelRefs,
 		decisionName,
+		result.Decision.RequiredCapabilities,
 		ctx.VSRContextTokenCount,
 		ctx,
+	)
+	if err != nil {
+		return "", entropy.ReasoningDecision{}, err
+	}
+	eligibleModelRefs, err = r.applyRuntimeRequestBudget(
+		eligibleModelRefs, result.Decision, decisionName, ctx,
 	)
 	if err != nil {
 		return "", entropy.ReasoningDecision{}, err
@@ -348,6 +349,12 @@ func (r *OpenAIRouter) selectDecisionRuntimeModel(
 		return "", entropy.ReasoningDecision{}, err
 	}
 	if selectedModelRef == nil {
+		if result.Decision.RequestBudget != nil {
+			return "", entropy.ReasoningDecision{}, fmt.Errorf(
+				"%w: selector returned no request-budget-eligible model for decision %q",
+				errNoContextEligibleDecisionModel, decisionName,
+			)
+		}
 		selectedModel := r.Config.DefaultModel
 		ctx.VSRSelectedModel = selectedModel
 		ctx.VSRSelectionMethod = "default"
@@ -376,6 +383,34 @@ func (r *OpenAIRouter) selectDecisionRuntimeModel(
 		evaluationConfidence,
 		ctx,
 	), nil
+}
+
+func (r *OpenAIRouter) validateRuntimeExplicitAlgorithmModels(
+	decisionConfig *config.Decision,
+	decisionName string,
+	ctx *RequestContext,
+) error {
+	if ineligible := r.contextIneligibleAlgorithmModelCount(decisionConfig, ctx.VSRContextTokenCount); ineligible > 0 {
+		return fmt.Errorf(
+			"%w: decision %q requires %d request tokens but %d explicitly configured algorithm model(s) have smaller context windows",
+			errNoContextEligibleDecisionModel, decisionName, ctx.VSRContextTokenCount, ineligible,
+		)
+	}
+	if ineligible := r.capabilityIneligibleAlgorithmModelCount(decisionConfig); ineligible > 0 {
+		return fmt.Errorf(
+			"%w: decision %q has %d explicitly configured algorithm model(s) missing required capabilities",
+			errNoContextEligibleDecisionModel, decisionName, ineligible,
+		)
+	}
+	if ineligible := r.requestBudgetIneligibleAlgorithmModelCount(
+		decisionConfig, ctx.VSRContextTokenCount, ctx.VSROutputTokenBound, ctx.VSRReasoningTokenBound, time.Now().UTC(),
+	); ineligible > 0 {
+		return fmt.Errorf(
+			"%w: decision %q has %d explicitly configured algorithm model(s) outside the request budget",
+			errNoContextEligibleDecisionModel, decisionName, ineligible,
+		)
+	}
+	return nil
 }
 
 func (r *OpenAIRouter) selectFastResponseRuntimeModel(

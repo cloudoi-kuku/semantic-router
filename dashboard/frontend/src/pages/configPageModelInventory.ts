@@ -283,6 +283,7 @@ export function validateModelStructuredFields(data: Record<string, unknown>): vo
       'cached_input_per_1m',
       'cache_write_per_1m',
       'completion_per_1m',
+      'reasoning_per_1m',
     ]
     for (const field of rateFields) {
       const value = pricing[field]

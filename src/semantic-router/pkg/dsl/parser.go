@@ -373,49 +373,6 @@ func rawToSignal(r *rawSignalDecl) *SignalDecl {
 	}
 }
 
-func rawToRoute(r *rawRouteDecl) *RouteDecl {
-	route := &RouteDecl{
-		Name: unquoteIdent(r.Name),
-		Pos:  posFromLexer(r.Pos),
-	}
-
-	applyRouteOptions(route, r.Opts)
-
-	// Process body items
-	for _, item := range r.Body {
-		switch {
-		case item.Priority != nil:
-			route.Priority = *item.Priority
-		case item.Tier != nil:
-			route.Tier = *item.Tier
-		case item.When != nil:
-			route.When = toBoolExpr(item.When)
-		case item.Model != nil:
-			for _, m := range item.Model.Models {
-				route.Models = append(route.Models, rawToModelRef(m))
-			}
-		case item.Algorithm != nil:
-			route.Algorithm = rawToAlgo(item.Algorithm)
-		case item.Plugin != nil:
-			route.Plugins = append(route.Plugins, rawToPluginRef(item.Plugin))
-		case item.Description != nil:
-			route.Description = unquote(*item.Description)
-		case item.Action != nil:
-			route.Action = &ActionDecl{
-				Type:        item.Action.Type,
-				Destination: unquoteIdent(item.Action.Destination),
-				Pos:         posFromLexer(item.Action.Pos),
-			}
-		case item.CandidateFor != nil:
-			route.CandidateIterations = append(route.CandidateIterations, rawToCandidateIteration(item.CandidateFor))
-		case item.Emit != nil:
-			route.Emits = append(route.Emits, rawToEmitDecl(item.Emit))
-		}
-	}
-
-	return route
-}
-
 func rawToModelDecl(r *rawModelDecl) *ModelDecl {
 	return &ModelDecl{
 		Name:   unquoteIdent(r.Name),

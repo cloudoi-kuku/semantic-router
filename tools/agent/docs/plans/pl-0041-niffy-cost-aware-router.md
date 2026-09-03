@@ -43,9 +43,15 @@ workflow decisions.
 - [x] `NIFFY-02` Ship `vllm-sr/routing-decision/v1alpha1` at
   `POST /api/v1/route/evaluate` and expose it through a permission-controlled
   dashboard inspector, with no provider generation or raw prompt echo.
-- [ ] `NIFFY-03` Define the capability catalogue and hard eligibility filter.
-- [ ] `NIFFY-04` Add versioned provider pricing, request cost estimation,
-  request budgets, and alternative-cost comparison.
+- [x] `NIFFY-03` Define the provider-neutral
+  `vllm-sr/model-capability-catalog/v1alpha1` vocabulary, carry hard
+  `required_capabilities` through YAML/DSL/CLI/dashboard contracts, filter
+  candidates before live and dry-run ranking, preserve the gate during Router
+  Learning expansion, and expose privacy-safe eligibility evidence.
+- [x] `NIFFY-04` Add `vllm-sr/provider-pricing/v1alpha1` provenance and
+  freshness metadata, conservative input/output/reasoning cost estimates,
+  hard per-request decision budgets, and inspectable alternative-cost
+  comparison before ranking.
 - [ ] `NIFFY-05` Define workflow contracts and implement an authorized
   web-search workflow.
 - [ ] `NIFFY-06` Add generic MCP discovery, authorization, execution, and
@@ -61,9 +67,9 @@ workflow decisions.
 
 ## Next Action
 
-Complete `NIFFY-03`: define a provider-independent capability vocabulary and
-catalogue schema, then apply hard capability eligibility before the existing
-model-selection algorithm ranks candidates.
+Complete `NIFFY-05`: define a provider-independent workflow contract and ship
+one authorized web-search workflow that returns bounded, provenance-tagged
+evidence to an eligible synthesis model.
 
 ## Operating Rules
 

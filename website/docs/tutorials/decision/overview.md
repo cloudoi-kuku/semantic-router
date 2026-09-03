@@ -46,6 +46,12 @@ routing:
         conditions:
           - type: domain
             name: business
+      required_capabilities: [chat]
+      request_budget:
+        currency: USD
+        max_estimated_cost: 0.01
+        output_token_bound: 2048
+        require_pricing: true
       modelRefs:
         - model: qwen2.5:3b
           use_reasoning: false
@@ -62,6 +68,27 @@ Decision matching stays separate from:
 - `providers.models[]`, which carries deployment bindings
 - `decision.algorithm`, which chooses among multiple candidate models
 - `decision.plugins`, which post-processes a matched route
+
+After a decision matches, `required_capabilities` removes models that do not
+advertise every required capability in `routing.modelCards`. This hard gate
+runs before an algorithm ranks the remaining candidates. In DSL, the same
+contract is `REQUIRES ["chat", "reasoning"]`. Omit it when a route has no hard
+capability requirement.
+
+`request_budget` is the next hard gate. It estimates each remaining candidate
+from the request input-token estimate and explicit output/reasoning ceilings,
+falling back to the configured token bounds when the caller omits them.
+Candidates with missing prices (when required), stale provenance (when
+required), another currency, or an estimate above `max_estimated_cost` are
+removed before ranking. The DSL form is `BUDGET { currency: "USD", ... }`.
+
+`workflow` is a distinct post-selection execution contract, not a model
+capability. `web_search_answer` checks the trusted user-groups header, performs
+one bounded SearXNG query, validates result URLs, and injects delimited,
+provenance-tagged untrusted evidence for the selected synthesis model. The DSL
+form is `WORKFLOW { type: "web_search_answer", ... }`. The route-evaluation API
+shows the planned workflow with `executes_tools: false`; it never performs the
+search during inspection.
 
 Choose the smallest shape that expresses the policy clearly:
 

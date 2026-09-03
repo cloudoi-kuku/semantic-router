@@ -335,11 +335,14 @@ func ruleCombinationValue(node *config.RuleCombination) ObjectValue {
 
 func (d *decompiler) decisionToRoute(dec *config.Decision) *RouteDecl {
 	route := &RouteDecl{
-		Name:        dec.Name,
-		Description: dec.Description,
-		OnUnknown:   string(dec.Rules.OnUnknown),
-		Priority:    dec.Priority,
-		Tier:        dec.Tier,
+		Name:                 dec.Name,
+		Description:          dec.Description,
+		OnUnknown:            string(dec.Rules.OnUnknown),
+		Priority:             dec.Priority,
+		Tier:                 dec.Tier,
+		RequiredCapabilities: append([]string(nil), dec.RequiredCapabilities...),
+		RequestBudget:        requestBudgetDeclFromConfig(dec.RequestBudget),
+		Workflow:             workflowDeclFromConfig(dec.Workflow),
 	}
 
 	if dec.Action != nil {
@@ -394,6 +397,32 @@ func (d *decompiler) decisionToRoute(dec *config.Decision) *RouteDecl {
 	}
 
 	return route
+}
+
+func workflowDeclFromConfig(workflow *config.WorkflowConfig) *WorkflowDecl {
+	if workflow == nil || workflow.WebSearch == nil {
+		return nil
+	}
+	search := workflow.WebSearch
+	return &WorkflowDecl{
+		Type: workflow.Type, AuthorizationGroup: workflow.AuthorizationGroup,
+		Provider: search.Provider, Endpoint: search.Endpoint,
+		APIKeyEnv: search.APIKeyEnv, APIKeyHeader: search.APIKeyHeader,
+		TimeoutSeconds: search.TimeoutSeconds, MaxResults: search.MaxResults,
+		MaxQueryCharacters: search.MaxQueryCharacters, MaxResponseBytes: int(search.MaxResponseBytes),
+		MaxEvidenceCharacters: search.MaxEvidenceCharacters,
+	}
+}
+
+func requestBudgetDeclFromConfig(budget *config.RequestBudget) *RequestBudgetDecl {
+	if budget == nil {
+		return nil
+	}
+	return &RequestBudgetDecl{
+		Currency: budget.Currency, MaxEstimatedCost: budget.MaxEstimatedCost,
+		OutputTokenBound: budget.OutputTokenBound, ReasoningTokenBound: budget.ReasoningTokenBound,
+		RequirePricing: budget.RequirePricing, RequireCurrentPricing: budget.RequireCurrentPricing,
+	}
 }
 
 func candidateIterationConfigToDecl(iter config.CandidateIterationConfig) *CandidateIterationDecl {

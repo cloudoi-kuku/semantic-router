@@ -4,12 +4,19 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/vllm-project/semantic-router/src/semantic-router/pkg/config"
 	"github.com/vllm-project/semantic-router/src/semantic-router/pkg/observability/logging"
+	"github.com/vllm-project/semantic-router/src/semantic-router/pkg/services"
 )
 
 var errNoContextEligibleDecisionModel = errors.New("no decision model can satisfy the request context")
+
+type modelEligibilityResult struct {
+	eligible   []config.ModelRef
+	exclusions []services.ModelEligibilityExclusion
+}
 
 // contextEligibleModelRefs applies only contracts that can be established from
 // local configuration. Missing or zero context-window metadata remains
@@ -32,32 +39,64 @@ func (r *OpenAIRouter) contextEligibleModelRefs(
 	return eligible, excluded
 }
 
+func (r *OpenAIRouter) eligibleModelRefs(
+	refs []config.ModelRef,
+	requiredCapabilities []string,
+	contextTokens int,
+) modelEligibilityResult {
+	result := modelEligibilityResult{eligible: make([]config.ModelRef, 0, len(refs))}
+	for _, ref := range refs {
+		exclusion := services.ModelEligibilityExclusion{Model: ref.Model}
+		if r.modelRefExceedsContextWindow(ref, contextTokens) {
+			exclusion.Reasons = append(exclusion.Reasons, "context_window")
+		}
+		if len(requiredCapabilities) > 0 {
+			params, ok := r.Config.ModelConfig[strings.TrimSpace(ref.Model)]
+			if !ok {
+				exclusion.MissingCapabilities = append([]string(nil), requiredCapabilities...)
+			} else {
+				exclusion.MissingCapabilities = config.MissingModelCapabilities(params, requiredCapabilities)
+			}
+			if len(exclusion.MissingCapabilities) > 0 {
+				exclusion.Reasons = append(exclusion.Reasons, "missing_capabilities")
+			}
+		}
+		if len(exclusion.Reasons) > 0 {
+			result.exclusions = append(result.exclusions, exclusion)
+			continue
+		}
+		result.eligible = append(result.eligible, ref)
+	}
+	return result
+}
+
 func (r *OpenAIRouter) contextEligibleDecisionModelRefs(
 	refs []config.ModelRef,
 	decisionName string,
+	requiredCapabilities []string,
 	contextTokens int,
 	ctx *RequestContext,
 ) ([]config.ModelRef, error) {
-	eligible, excluded := r.contextEligibleModelRefs(refs, contextTokens)
-	if len(eligible) == 0 && excluded > 0 {
+	result := r.eligibleModelRefs(refs, requiredCapabilities, contextTokens)
+	if len(result.eligible) == 0 && len(result.exclusions) > 0 {
 		return nil, fmt.Errorf(
-			"%w: decision %q requires %d request tokens but every configured candidate has a smaller context window",
+			"%w: every configured candidate for decision %q failed context or capability eligibility",
 			errNoContextEligibleDecisionModel,
 			decisionName,
-			contextTokens,
 		)
 	}
-	ctx.VSREligibleModelRefs = cloneModelRefs(eligible)
-	if excluded > 0 {
-		logging.ComponentEvent("extproc", "decision_models_context_filtered", map[string]interface{}{
-			"request_id":          ctx.RequestID,
-			"decision":            decisionName,
-			"context_tokens":      contextTokens,
-			"excluded_candidates": excluded,
-			"eligible_candidates": len(eligible),
+	ctx.VSREligibleModelRefs = cloneModelRefs(result.eligible)
+	if len(result.exclusions) > 0 {
+		logging.ComponentEvent("extproc", "decision_models_eligibility_filtered", map[string]interface{}{
+			"request_id":            ctx.RequestID,
+			"decision":              decisionName,
+			"context_tokens":        contextTokens,
+			"required_capabilities": append([]string(nil), requiredCapabilities...),
+			"excluded_candidates":   len(result.exclusions),
+			"eligible_candidates":   len(result.eligible),
 		})
 	}
-	return eligible, nil
+	return result.eligible, nil
 }
 
 func (r *OpenAIRouter) modelRefExceedsContextWindow(ref config.ModelRef, contextTokens int) bool {
@@ -82,7 +121,13 @@ func (r *OpenAIRouter) decisionRouteActionDestination(
 	if destination == "" {
 		return "", false, nil
 	}
-	if !r.modelNameExceedsContextWindow(destination, ctx.VSRContextTokenCount) {
+	destinationBudget := r.requestBudgetEligibleModelRefs(
+		[]config.ModelRef{{Model: destination}}, decision.RequestBudget,
+		ctx.VSRContextTokenCount, ctx.VSROutputTokenBound, ctx.VSRReasoningTokenBound, time.Now().UTC(),
+	)
+	if !r.modelNameExceedsContextWindow(destination, ctx.VSRContextTokenCount) &&
+		len(r.modelNameMissingCapabilities(destination, decision.RequiredCapabilities)) == 0 &&
+		len(destinationBudget.eligible) > 0 {
 		logging.ComponentEvent("extproc", "route_action_applied", map[string]interface{}{
 			"request_id":  ctx.RequestID,
 			"decision":    decision.Name,
@@ -90,24 +135,43 @@ func (r *OpenAIRouter) decisionRouteActionDestination(
 		})
 		return destination, true, nil
 	}
-	eligible, _ := r.contextEligibleModelRefs(decision.ModelRefs, ctx.VSRContextTokenCount)
-	if len(eligible) > 0 {
+	eligibility := r.eligibleModelRefs(
+		decision.ModelRefs,
+		decision.RequiredCapabilities,
+		ctx.VSRContextTokenCount,
+	)
+	budgetEligibility := r.requestBudgetEligibleModelRefs(
+		eligibility.eligible, decision.RequestBudget,
+		ctx.VSRContextTokenCount, ctx.VSROutputTokenBound, ctx.VSRReasoningTokenBound, time.Now().UTC(),
+	)
+	eligibility.eligible = budgetEligibility.eligible
+	if len(eligibility.eligible) > 0 {
 		logging.ComponentEvent("extproc", "route_action_destination_ineligible", map[string]interface{}{
 			"request_id":     ctx.RequestID,
 			"decision":       decision.Name,
 			"destination":    destination,
-			"fallback":       eligible[0].Model,
+			"fallback":       eligibility.eligible[0].Model,
 			"context_tokens": ctx.VSRContextTokenCount,
 		})
-		return eligible[0].Model, true, nil
+		return eligibility.eligible[0].Model, true, nil
 	}
 	return "", false, fmt.Errorf(
-		"%w: route action destination %q and every candidate of decision %q have a smaller context window than the %d request tokens",
+		"%w: route action destination %q and every candidate of decision %q failed context or capability eligibility",
 		errNoContextEligibleDecisionModel,
 		destination,
 		decision.Name,
-		ctx.VSRContextTokenCount,
 	)
+}
+
+func (r *OpenAIRouter) modelNameMissingCapabilities(model string, required []string) []string {
+	if r == nil || r.Config == nil || len(required) == 0 {
+		return nil
+	}
+	params, ok := r.Config.ModelConfig[strings.TrimSpace(model)]
+	if !ok {
+		return append([]string(nil), required...)
+	}
+	return config.MissingModelCapabilities(params, required)
 }
 
 func validateMinimumEligibleDecisionModels(
@@ -172,6 +236,30 @@ func (r *OpenAIRouter) contextIneligibleAlgorithmModelCount(
 		}
 		seen[model] = struct{}{}
 		if r.modelNameExceedsContextWindow(model, contextTokens) {
+			count++
+		}
+	}
+	return count
+}
+
+func (r *OpenAIRouter) capabilityIneligibleAlgorithmModelCount(
+	decision *config.Decision,
+) int {
+	if decision == nil || decision.Algorithm == nil || len(decision.RequiredCapabilities) == 0 {
+		return 0
+	}
+	seen := make(map[string]struct{})
+	count := 0
+	for _, model := range explicitAlgorithmModels(decision.Algorithm) {
+		model = strings.TrimSpace(model)
+		if model == "" {
+			continue
+		}
+		if _, ok := seen[model]; ok {
+			continue
+		}
+		seen[model] = struct{}{}
+		if len(r.modelNameMissingCapabilities(model, decision.RequiredCapabilities)) > 0 {
 			count++
 		}
 	}

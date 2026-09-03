@@ -16,6 +16,8 @@ func TestValidateModelPricingContracts(t *testing.T) {
 		{
 			name: "complete pricing",
 			pricing: ModelPricing{
+				Version: "2026-09", Source: "official", Unit: PricingUnitPerMillionTokens,
+				EffectiveAt: "2026-09-01T00:00:00Z", ExpiresAt: "2026-12-01T00:00:00Z",
 				Currency: "USD", PromptPer1M: 0.5, CompletionPer1M: 1.5,
 				CachedInputPer1M: 0.05, CacheWritePer1M: &cacheWrite,
 			},
@@ -25,6 +27,9 @@ func TestValidateModelPricingContracts(t *testing.T) {
 		{name: "invalid currency", pricing: ModelPricing{Currency: "usd"}, wantErr: "pricing.currency"},
 		{name: "negative input", pricing: ModelPricing{PromptPer1M: -0.1}, wantErr: "pricing.prompt_per_1m"},
 		{name: "infinite output", pricing: ModelPricing{CompletionPer1M: math.Inf(1)}, wantErr: "pricing.completion_per_1m"},
+		{name: "unsupported unit", pricing: ModelPricing{Currency: "USD", Unit: "per_token"}, wantErr: "pricing.unit"},
+		{name: "invalid effective date", pricing: ModelPricing{Currency: "USD", EffectiveAt: "yesterday"}, wantErr: "pricing.effective_at"},
+		{name: "reversed window", pricing: ModelPricing{Currency: "USD", EffectiveAt: "2026-09-02T00:00:00Z", ExpiresAt: "2026-09-01T00:00:00Z"}, wantErr: "must be after"},
 	}
 
 	for _, test := range tests {

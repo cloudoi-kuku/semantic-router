@@ -55,7 +55,7 @@ func (r *OpenAIRouter) runRequestPreRoutingStages(
 			return requestDecisionState{}, r.createErrorResponse(499, "request canceled")
 		}
 		if errors.Is(decisionErr, errNoContextEligibleDecisionModel) {
-			logging.Warnf("[Request Body] Decision candidates cannot satisfy request context: %v", decisionErr)
+			logging.Warnf("[Request Body] Decision candidates failed request eligibility: %v", decisionErr)
 			return requestDecisionState{}, r.createErrorResponse(422, decisionErr.Error())
 		}
 		logging.Errorf("[Request Body] Decision evaluation failed: %v", decisionErr)
@@ -67,8 +67,7 @@ func (r *OpenAIRouter) runRequestPreRoutingStages(
 	metrics.RecordModelRequest(selectedModel)
 	ctx.InflightToken = inflight.Begin(selectedModel)
 	if resp := r.handleFastResponse(ctx, decisionName); resp != nil {
-		inflight.End(selectedModel, ctx.InflightToken)
-		ctx.InflightToken = 0
+		endRequestInflight(ctx, selectedModel)
 		r.startRouterReplay(ctx, originalModel, selectedModel, decisionName)
 		r.updateRouterReplayStatus(ctx, 200, false)
 		r.attachRouterReplayResponse(
@@ -80,18 +79,20 @@ func (r *OpenAIRouter) runRequestPreRoutingStages(
 		return requestDecisionState{}, resp
 	}
 	if resp := r.applyRateLimit(ctx, selectedModel); resp != nil {
-		inflight.End(selectedModel, ctx.InflightToken)
-		ctx.InflightToken = 0
+		endRequestInflight(ctx, selectedModel)
 		return requestDecisionState{}, resp
 	}
 	if resp := r.applyCacheChecks(ctx, selectedModel, decisionName); resp != nil {
-		inflight.End(selectedModel, ctx.InflightToken)
-		ctx.InflightToken = 0
+		endRequestInflight(ctx, selectedModel)
 		return requestDecisionState{}, resp
 	}
+	if workflowErr := r.executeDecisionWorkflow(ctx, decisionName); workflowErr != nil {
+		endRequestInflight(ctx, selectedModel)
+		statusCode := workflowErrorStatus(workflowErr)
+		return requestDecisionState{}, r.createErrorResponse(statusCode, workflowErr.Error())
+	}
 	if ragErr := r.executeRAGPlugin(ctx, decisionName); ragErr != nil {
-		inflight.End(selectedModel, ctx.InflightToken)
-		ctx.InflightToken = 0
+		endRequestInflight(ctx, selectedModel)
 		return requestDecisionState{}, r.createErrorResponse(503, fmt.Sprintf("RAG retrieval failed: %v", ragErr))
 	}
 
@@ -100,6 +101,11 @@ func (r *OpenAIRouter) runRequestPreRoutingStages(
 		reasoningDecision: reasoningDecision,
 		selectedModel:     selectedModel,
 	}, nil
+}
+
+func endRequestInflight(ctx *RequestContext, selectedModel string) {
+	inflight.End(selectedModel, ctx.InflightToken)
+	ctx.InflightToken = 0
 }
 
 // respondDecisionUnresolved builds the fail_request 503 and finalizes the
@@ -133,6 +139,14 @@ func applyRequestContextEstimate(snapshot *requestSignalSnapshot, ctx *RequestCo
 	ctx.VSRContextTextBytes = snapshot.ContextTextBytes
 	ctx.VSRContextEquivalentBytes = snapshot.ContextEquivalentBytes
 	ctx.VSRContextHasNonText = snapshot.ContextHasNonText
+	if ctx.SemanticRequest != nil {
+		if bound := ctx.SemanticRequest.Sampling.MaxOutputTokens; bound != nil && *bound > 0 {
+			ctx.VSROutputTokenBound = int(*bound)
+		}
+		if bound := ctx.SemanticRequest.ReasoningBudgetTokens; bound != nil && *bound > 0 {
+			ctx.VSRReasoningTokenBound = int(*bound)
+		}
+	}
 }
 
 func (r *OpenAIRouter) applyCacheChecks(

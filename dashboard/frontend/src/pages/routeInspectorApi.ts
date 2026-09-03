@@ -14,6 +14,55 @@ export interface RoutingDecisionSelection {
   reason?: string
 }
 
+export interface RoutingDecisionEligibilityExclusion {
+  model: string
+  reasons: string[]
+  missing_capabilities?: string[]
+}
+
+export interface RoutingDecisionEligibility {
+  catalog_version: string
+  required_capabilities?: string[]
+  eligible_models?: string[]
+  excluded_models?: RoutingDecisionEligibilityExclusion[]
+}
+
+export interface RoutingDecisionCost {
+  catalog_version: string
+  currency: string
+  input_tokens: number
+  output_tokens: number
+  reasoning_tokens?: number
+  max_cost: number
+  candidates: Array<{
+    model: string
+    estimated_cost?: number
+    eligible: boolean
+    status: string
+    price_version?: string
+    price_source?: string
+    effective_at?: string
+    expires_at?: string
+  }>
+}
+
+export interface RoutingDecisionWorkflow {
+  contract_version: string
+  type: string
+  status: string
+  authorization: { required_group: string; status: string }
+  tool: {
+    type: string
+    provider: string
+    max_results: number
+    timeout_seconds: number
+    max_response_bytes: number
+    max_evidence_characters: number
+  }
+  synthesis_model?: string
+  executes_tools: boolean
+}
+
 export interface RoutingDecisionSignals {
   used?: Record<string, unknown>
   matched?: Record<string, unknown>
@@ -36,6 +85,9 @@ export interface RoutingDecisionEnvelope {
   dry_run: boolean
   route: RoutingDecisionRoute
   selection: RoutingDecisionSelection
+  eligibility?: RoutingDecisionEligibility
+  cost?: RoutingDecisionCost
+  workflow?: RoutingDecisionWorkflow
   signals: RoutingDecisionSignals
   diagnostics?: {
     signal_errors?: Record<string, string>

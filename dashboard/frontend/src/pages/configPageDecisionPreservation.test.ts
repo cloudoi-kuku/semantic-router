@@ -14,6 +14,14 @@ describe('decision editor preservation', () => {
       priority: 10,
       tier: 1,
       annotations: { owner: 'routing' },
+      required_capabilities: ['chat', 'reasoning'],
+      request_budget: {
+        currency: 'USD',
+        max_estimated_cost: 0.1,
+        output_token_bound: 4096,
+        require_pricing: true,
+        require_current_pricing: true,
+      },
       rules: {
         operator: 'AND',
         conditions: [{ type: 'keyword', name: 'complex' }],
@@ -45,6 +53,8 @@ describe('decision editor preservation', () => {
     expect(updated.description).toBe('after')
     expect(updated.algorithm).toEqual(existing.algorithm)
     expect(updated.annotations).toEqual(existing.annotations)
+    expect(updated.required_capabilities).toEqual(['chat', 'reasoning'])
+    expect(updated.request_budget).toEqual(existing.request_budget)
     expect(updated.tier).toBe(1)
   })
 

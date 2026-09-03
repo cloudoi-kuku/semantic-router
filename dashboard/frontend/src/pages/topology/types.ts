@@ -155,6 +155,8 @@ export interface DecisionConfig {
   priority: number
   rules: RuleCombination
   modelRefs: ModelRefConfig[]
+  required_capabilities?: string[]
+  workflow?: Record<string, unknown>
   algorithm?: AlgorithmConfig
   plugins?: PluginConfig[]
 }

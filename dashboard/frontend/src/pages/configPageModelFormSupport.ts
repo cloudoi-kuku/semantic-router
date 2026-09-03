@@ -87,6 +87,11 @@ export function normalizeModelPricing(value: unknown): ModelPricing | undefined 
 
   const pricing = value as Record<string, unknown>
   const normalized: ModelPricing = {}
+  for (const field of ['version', 'source', 'effective_at', 'expires_at'] as const) {
+    if (typeof pricing[field] === 'string' && pricing[field].trim())
+      normalized[field] = pricing[field].trim()
+  }
+  if (pricing.unit === 'per_1m_tokens') normalized.unit = pricing.unit
   if (typeof pricing.currency === 'string' && pricing.currency.trim())
     normalized.currency = pricing.currency.trim()
   if (typeof pricing.prompt_per_1m === 'number' && Number.isFinite(pricing.prompt_per_1m))
@@ -105,6 +110,8 @@ export function normalizeModelPricing(value: unknown): ModelPricing | undefined 
   }
   if (typeof pricing.completion_per_1m === 'number' && Number.isFinite(pricing.completion_per_1m))
     normalized.completion_per_1m = pricing.completion_per_1m
+  if (typeof pricing.reasoning_per_1m === 'number' && Number.isFinite(pricing.reasoning_per_1m))
+    normalized.reasoning_per_1m = pricing.reasoning_per_1m
   return Object.keys(normalized).length > 0 ? normalized : undefined
 }
 

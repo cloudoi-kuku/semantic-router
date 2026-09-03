@@ -23,7 +23,7 @@ func (c *RouterConfig) GetFullModelPricing(modelName string) (ModelPricing, bool
 }
 
 func normalizeConfiguredPricing(pricing ModelPricing) (ModelPricing, bool) {
-	if pricing.PromptPer1M == 0 && pricing.CompletionPer1M == 0 && pricing.CachedInputPer1M == 0 && pricing.CacheWritePer1M == nil && pricing.Currency == "" {
+	if pricing.PromptPer1M == 0 && pricing.CompletionPer1M == 0 && pricing.CachedInputPer1M == 0 && pricing.CacheWritePer1M == nil && pricing.ReasoningPer1M == nil && pricing.Currency == "" && pricing.Version == "" && pricing.Source == "" {
 		return ModelPricing{}, false
 	}
 	if pricing.Currency == "" {

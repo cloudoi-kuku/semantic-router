@@ -193,6 +193,24 @@ routing:
     - name: explanatory_answer
       description: Prefer an explanatory answer when the request asks for one.
       priority: 100
+      required_capabilities: [chat]
+      request_budget:
+        currency: USD
+        max_estimated_cost: 0.01
+        output_token_bound: 2048
+        require_pricing: true
+        require_current_pricing: true
+      workflow:
+        type: web_search_answer
+        authorization_group: web-search-users
+        web_search:
+          provider: searxng
+          endpoint: https://search.example.com/search
+          timeout_seconds: 5
+          max_results: 5
+          max_query_characters: 500
+          max_response_bytes: 262144
+          max_evidence_characters: 8000
       rules:
         operator: AND
         conditions:
@@ -212,6 +230,38 @@ Classifier backend failures remain `Unknown` while the complete boolean tree
 is evaluated. Set `rules.on_unknown` to `no_match`, `match`, or `fail_request`
 to resolve an undetermined terminal result. Omitting it preserves the existing
 classifier-family error behavior.
+
+`required_capabilities` filters `modelRefs` before any selection algorithm
+ranks them. Values use the provider-neutral
+`vllm-sr/model-capability-catalog/v1alpha1` vocabulary: `chat`, `text`,
+`reasoning`, `tool_calling`, `parallel_tool_calling`, `structured_output`,
+`json_schema`, `vision`, `audio`, `video`, `file`, `embeddings`, and
+`image_generation`. Model cards may carry additional
+descriptive tags, but hard requirements must use a catalogue value. Omit the
+field to preserve the previous candidate behavior.
+
+Provider prices used by a request budget should carry provenance and a bounded
+validity window:
+
+```yaml
+providers:
+  models:
+    - name: local/general
+      pricing:
+        version: "2026-09-03"
+        source: https://provider.example/pricing
+        unit: per_1m_tokens
+        effective_at: "2026-09-03T00:00:00Z"
+        expires_at: "2026-12-03T00:00:00Z"
+        currency: USD
+        prompt_per_1m: 0.15
+        completion_per_1m: 0.60
+```
+
+The estimate is not an invoice: it prices conservative pre-execution token
+bounds. Actual cost remains based on provider-reported response usage. When
+`require_current_pricing` is enabled, incomplete or expired provenance fails
+closed. In DSL, the equivalent decision statement is `BUDGET { ... }`.
 
 Requests using an automatic model alias enter the default `routing` profile.
 A concrete provider model name is a direct pass-through request and bypasses

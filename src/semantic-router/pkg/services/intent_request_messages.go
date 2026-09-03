@@ -32,6 +32,7 @@ type intentSignalInput struct {
 	evaluationText    string
 	contextText       string
 	currentUserText   string
+	inputTokenFloor   int
 	priorUserMessages []string
 	nonUserMessages   []string
 	hasAssistantReply bool
@@ -106,6 +107,7 @@ func (req IntentRequest) resolveSignalInput() (intentSignalInput, error) {
 			req.Metadata,
 			contextEstimate,
 		)
+		input.inputTokenFloor = intentInputTokenFloor(contextEstimate)
 		input.requestFacts.InputModality = inputModality
 		if useTopLevelTextFallback && text != "" && input.requestFacts.InputModality.TextContentCount == 0 {
 			// req.Text supplied user text the message walk could not see.
@@ -132,6 +134,7 @@ func (req IntentRequest) resolveSignalInput() (intentSignalInput, error) {
 		evaluationText:  text,
 		contextText:     text,
 		currentUserText: rawText,
+		inputTokenFloor: intentInputTokenFloor(contextEstimate),
 		conversationFacts: classification.ConversationFacts{
 			UserMessageCount:    1,
 			ToolDefinitionCount: toolDefinitionCount,
@@ -145,6 +148,13 @@ func (req IntentRequest) resolveSignalInput() (intentSignalInput, error) {
 		fallbackInput.requestFacts.InputModality.TextContentCount = 1
 	}
 	return fallbackInput, nil
+}
+
+// intentInputTokenFloor removes the generation reserve from the context-window
+// admission estimate. Cost estimation prices that reserve independently as
+// output tokens and must not count it again as provider input.
+func intentInputTokenFloor(estimate classification.RequestContextEstimate) int {
+	return max(estimate.TokenFloor-estimate.OutputTokenReserve, 0)
 }
 
 func fallbackText(text string, enabled bool) string {

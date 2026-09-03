@@ -98,6 +98,21 @@ runtime dependency; they do not define routing behavior by themselves.
   values.
 - `routing.modelCards` describes semantic capabilities; concrete URLs,
   credentials, and pricing belong in `providers.models`.
+- `routing.decisions[].required_capabilities` is a provider-neutral hard gate
+  over model-card capabilities. It runs before ranking; unknown model metadata
+  fails closed when a requirement is declared. The v1alpha1 vocabulary is
+  `chat`, `text`, `reasoning`, `tool_calling`, `parallel_tool_calling`,
+  `structured_output`, `json_schema`, `vision`, `audio`, `video`, `file`,
+  `embeddings`, and `image_generation`.
+- `providers.models[].pricing` may pin `version`, `source`, `unit`,
+  `effective_at`, and `expires_at` alongside token rates. A decision-level
+  `request_budget` estimates candidate cost from input/output/reasoning token
+  bounds and filters missing, stale, wrong-currency, or over-budget models
+  before ranking.
+- `routing.decisions[].workflow` selects a provider-independent execution path
+  before synthesis. The initial `web_search_answer` contract requires a trusted
+  authorization group and bounds the SearXNG query, timeout, result count,
+  response bytes, and provenance-tagged evidence injected into the model.
 - Protocol controls such as `tool_choice` enter routing as conversation facts;
   projections combine those facts with text-derived intent before decisions
   apply policy.

@@ -33,6 +33,50 @@ func TestContextEligibleModelRefsFiltersOnlyKnownInsufficientWindows(t *testing.
 	assertModelRefs(t, eligible, []string{"large", "unset", "unregistered"})
 }
 
+func TestEligibleModelRefsFiltersMissingRequiredCapabilities(t *testing.T) {
+	router := &OpenAIRouter{Config: &config.RouterConfig{
+		BackendModels: config.BackendModels{ModelConfig: map[string]config.ModelParams{
+			"general":   {Capabilities: []string{"chat", "tool_calling"}},
+			"reasoning": {Capabilities: []string{"chat", "reasoning"}},
+		}},
+	}}
+
+	result := router.eligibleModelRefs(
+		[]config.ModelRef{{Model: "general"}, {Model: "reasoning"}, {Model: "unknown"}},
+		[]string{"chat", "reasoning"},
+		0,
+	)
+
+	assertModelRefs(t, result.eligible, []string{"reasoning"})
+	require.Len(t, result.exclusions, 2)
+	assert.Equal(t, []string{"reasoning"}, result.exclusions[0].MissingCapabilities)
+	assert.Equal(t, []string{"chat", "reasoning"}, result.exclusions[1].MissingCapabilities)
+}
+
+func TestSelectModelForEvalReportsCapabilityEligibility(t *testing.T) {
+	decisionConfig := &config.Decision{
+		Name:                 "reasoning-route",
+		RequiredCapabilities: []string{"chat", "reasoning"},
+		ModelRefs:            []config.ModelRef{{Model: "general"}, {Model: "reasoning"}},
+		Algorithm:            &config.AlgorithmConfig{Type: config.DecisionAlgorithmStatic},
+	}
+	router := &OpenAIRouter{Config: &config.RouterConfig{
+		BackendModels: config.BackendModels{ModelConfig: map[string]config.ModelParams{
+			"general":   {Capabilities: []string{"chat"}},
+			"reasoning": {Capabilities: []string{"chat", "reasoning"}},
+		}},
+	}}
+
+	selection := router.SelectModelForEval(services.EvalModelSelectionInput{Decision: decisionConfig})
+
+	assert.Equal(t, "reasoning", selection.SelectedModel)
+	require.NotNil(t, selection.Eligibility)
+	assert.Equal(t, config.ModelCapabilityCatalogVersion, selection.Eligibility.CatalogVersion)
+	assert.Equal(t, []string{"reasoning"}, selection.Eligibility.EligibleModels)
+	require.Len(t, selection.Eligibility.ExcludedModels, 1)
+	assert.Equal(t, []string{"reasoning"}, selection.Eligibility.ExcludedModels[0].MissingCapabilities)
+}
+
 func TestSelectDecisionRuntimeModelRejectsAllKnownInsufficientWindows(t *testing.T) {
 	decisionConfig := &config.Decision{
 		Name: "known-small-models",
@@ -292,5 +336,33 @@ func TestRouterLearningExpansionFiltersKnownInsufficientWindows(t *testing.T) {
 		t,
 		router.learningCandidateModels(selCtx, ctx, config.RouterLearningCandidateSetTier),
 		[]string{"large"},
+	)
+}
+
+func TestRouterLearningExpansionPreservesSelectedDecisionCapabilities(t *testing.T) {
+	router := &OpenAIRouter{Config: &config.RouterConfig{
+		BackendModels: config.BackendModels{ModelConfig: map[string]config.ModelParams{
+			"general":   {Capabilities: []string{"chat"}},
+			"reasoning": {Capabilities: []string{"chat", "reasoning"}},
+		}},
+		IntelligentRouting: config.IntelligentRouting{Decisions: []config.Decision{
+			{Name: "general", Tier: 2, ModelRefs: []config.ModelRef{{Model: "general"}}},
+			{Name: "reasoning", Tier: 2, ModelRefs: []config.ModelRef{{Model: "reasoning"}}},
+		}},
+	}}
+	ctx := &RequestContext{VSRSelectedDecision: &config.Decision{
+		Name:                 "selected",
+		Tier:                 2,
+		RequiredCapabilities: []string{"chat", "reasoning"},
+	}}
+	selCtx := &selection.SelectionContext{
+		DecisionName:    "selected",
+		CandidateModels: []config.ModelRef{{Model: "general"}},
+	}
+
+	assertModelRefs(
+		t,
+		router.learningCandidateModels(selCtx, ctx, config.RouterLearningCandidateSetTier),
+		[]string{"reasoning"},
 	)
 }

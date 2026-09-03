@@ -72,10 +72,15 @@ func (r *OpenAIRouter) eligibleLearningModelRefs(refs []config.ModelRef, ctx *Re
 		return nil
 	}
 	eligible := make([]config.ModelRef, 0, len(refs))
+	var requiredCapabilities []string
+	if ctx != nil && ctx.VSRSelectedDecision != nil {
+		requiredCapabilities = ctx.VSRSelectedDecision.RequiredCapabilities
+	}
 	for _, ref := range refs {
 		if strings.TrimSpace(ref.Model) == "" ||
 			!r.configuredBackendModel(ref.Model) ||
-			(ctx != nil && r.modelRefExceedsContextWindow(ref, ctx.VSRContextTokenCount)) {
+			(ctx != nil && r.modelRefExceedsContextWindow(ref, ctx.VSRContextTokenCount)) ||
+			len(r.modelNameMissingCapabilities(ref.Model, requiredCapabilities)) > 0 {
 			continue
 		}
 		eligible = append(eligible, ref)

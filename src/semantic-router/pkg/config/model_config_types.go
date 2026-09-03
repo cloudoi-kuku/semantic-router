@@ -346,11 +346,17 @@ type ProviderProfile struct {
 }
 
 type ModelPricing struct {
+	Version          string   `yaml:"version,omitempty"`
+	Source           string   `yaml:"source,omitempty"`
+	Unit             string   `yaml:"unit,omitempty"`
+	EffectiveAt      string   `yaml:"effective_at,omitempty"`
+	ExpiresAt        string   `yaml:"expires_at,omitempty"`
 	Currency         string   `yaml:"currency,omitempty"`
 	PromptPer1M      float64  `yaml:"prompt_per_1m,omitempty"`
 	CompletionPer1M  float64  `yaml:"completion_per_1m,omitempty"`
 	CachedInputPer1M float64  `yaml:"cached_input_per_1m,omitempty"`
 	CacheWritePer1M  *float64 `yaml:"cache_write_per_1m,omitempty"`
+	ReasoningPer1M   *float64 `yaml:"reasoning_per_1m,omitempty"`
 }
 
 type ModelParams struct {

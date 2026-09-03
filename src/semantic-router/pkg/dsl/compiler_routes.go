@@ -14,13 +14,37 @@ func (c *Compiler) compileRoutes() {
 
 func (c *Compiler) compileRoute(r *RouteDecl) config.Decision {
 	decision := config.Decision{
-		Name:        r.Name,
-		Description: r.Description,
-		Priority:    r.Priority,
-		Tier:        r.Tier,
-		Rules:       c.compileRouteRules(r),
+		Name:                 r.Name,
+		Description:          r.Description,
+		Priority:             r.Priority,
+		Tier:                 r.Tier,
+		RequiredCapabilities: append([]string(nil), r.RequiredCapabilities...),
+		Rules:                c.compileRouteRules(r),
 	}
 	decision.Rules.OnUnknown = config.UnknownPolicy(r.OnUnknown)
+	if r.RequestBudget != nil {
+		decision.RequestBudget = &config.RequestBudget{
+			Currency:              r.RequestBudget.Currency,
+			MaxEstimatedCost:      r.RequestBudget.MaxEstimatedCost,
+			OutputTokenBound:      r.RequestBudget.OutputTokenBound,
+			ReasoningTokenBound:   r.RequestBudget.ReasoningTokenBound,
+			RequirePricing:        r.RequestBudget.RequirePricing,
+			RequireCurrentPricing: r.RequestBudget.RequireCurrentPricing,
+		}
+	}
+	if r.Workflow != nil {
+		decision.Workflow = &config.WorkflowConfig{
+			Type: r.Workflow.Type, AuthorizationGroup: r.Workflow.AuthorizationGroup,
+			WebSearch: &config.WebSearchWorkflowConfig{
+				Provider: r.Workflow.Provider, Endpoint: r.Workflow.Endpoint,
+				APIKeyEnv: r.Workflow.APIKeyEnv, APIKeyHeader: r.Workflow.APIKeyHeader,
+				TimeoutSeconds: r.Workflow.TimeoutSeconds, MaxResults: r.Workflow.MaxResults,
+				MaxQueryCharacters:    r.Workflow.MaxQueryCharacters,
+				MaxResponseBytes:      int64(r.Workflow.MaxResponseBytes),
+				MaxEvidenceCharacters: r.Workflow.MaxEvidenceCharacters,
+			},
+		}
+	}
 	if r.Action != nil {
 		decision.Action = &config.DecisionAction{
 			Type:        r.Action.Type,

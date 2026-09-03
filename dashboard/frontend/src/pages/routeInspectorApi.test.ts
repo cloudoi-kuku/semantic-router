@@ -19,6 +19,27 @@ describe('route inspector API', () => {
           dry_run: true,
           route: { decision: 'reasoning-route' },
           selection: { selected_model: 'niffy-reasoning' },
+          eligibility: {
+            catalog_version: 'vllm-sr/model-capability-catalog/v1alpha1',
+            required_capabilities: ['chat', 'reasoning'],
+            eligible_models: ['niffy-reasoning'],
+          },
+          workflow: {
+            contract_version: 'vllm-sr/workflow/v1alpha1',
+            type: 'web_search_answer',
+            status: 'planned',
+            authorization: { required_group: 'web-search-users', status: 'not_evaluated' },
+            tool: {
+              type: 'web_search',
+              provider: 'searxng',
+              max_results: 5,
+              timeout_seconds: 5,
+              max_response_bytes: 262144,
+              max_evidence_characters: 8000,
+            },
+            synthesis_model: 'niffy-reasoning',
+            executes_tools: false,
+          },
           signals: { matched: { keywords: ['reasoning_intent'] } },
         }),
         { status: 200, headers: { 'Content-Type': 'application/json' } },
@@ -33,6 +54,8 @@ describe('route inspector API', () => {
     })
 
     expect(result.selection.selected_model).toBe('niffy-reasoning')
+    expect(result.eligibility?.required_capabilities).toEqual(['chat', 'reasoning'])
+    expect(result.workflow?.executes_tools).toBe(false)
     expect(fetchMock).toHaveBeenCalledWith(
       '/api/router/api/v1/route/evaluate?trace=true',
       expect.objectContaining({

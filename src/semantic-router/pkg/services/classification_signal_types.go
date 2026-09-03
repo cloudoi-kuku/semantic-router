@@ -19,18 +19,19 @@ const (
 
 // IntentRequest represents a request for intent classification.
 type IntentRequest struct {
-	Text                string            `json:"text"`
-	Messages            []IntentMessage   `json:"messages,omitempty"`
-	Tools               []json.RawMessage `json:"tools,omitempty"`
-	Functions           []json.RawMessage `json:"functions,omitempty"`
-	ToolChoice          json.RawMessage   `json:"tool_choice,omitempty"`
-	FunctionCall        json.RawMessage   `json:"function_call,omitempty"`
-	ResponseFormat      json.RawMessage   `json:"response_format,omitempty"`
-	MaxTokens           json.RawMessage   `json:"max_tokens,omitempty"`
-	MaxCompletionTokens json.RawMessage   `json:"max_completion_tokens,omitempty"`
-	Model               string            `json:"model,omitempty"`
-	Metadata            map[string]string `json:"metadata,omitempty"`
-	Options             *IntentOptions    `json:"options,omitempty"`
+	Text                  string            `json:"text"`
+	Messages              []IntentMessage   `json:"messages,omitempty"`
+	Tools                 []json.RawMessage `json:"tools,omitempty"`
+	Functions             []json.RawMessage `json:"functions,omitempty"`
+	ToolChoice            json.RawMessage   `json:"tool_choice,omitempty"`
+	FunctionCall          json.RawMessage   `json:"function_call,omitempty"`
+	ResponseFormat        json.RawMessage   `json:"response_format,omitempty"`
+	MaxTokens             json.RawMessage   `json:"max_tokens,omitempty"`
+	MaxCompletionTokens   json.RawMessage   `json:"max_completion_tokens,omitempty"`
+	ReasoningBudgetTokens json.RawMessage   `json:"reasoning_budget_tokens,omitempty"`
+	Model                 string            `json:"model,omitempty"`
+	Metadata              map[string]string `json:"metadata,omitempty"`
+	Options               *IntentOptions    `json:"options,omitempty"`
 }
 
 // IntentOptions contains options for intent classification.
@@ -97,6 +98,9 @@ type EvalResponse struct {
 	SelectionStatus        string                                  `json:"selection_status,omitempty"`   // selected, planned_final, fallback, execution_required, unavailable, or failed
 	SelectionMethod        string                                  `json:"selection_method,omitempty"`
 	SelectionReason        string                                  `json:"selection_reason,omitempty"`
+	Eligibility            *ModelEligibility                       `json:"eligibility,omitempty"`
+	Cost                   *RequestCostEvaluation                  `json:"cost,omitempty"`
+	Workflow               *WorkflowEvaluation                     `json:"workflow,omitempty"`
 	RoutingDecision        string                                  `json:"routing_decision,omitempty"`
 	Metrics                *classification.SignalMetricsCollection `json:"metrics"`                      // Performance and confidence for each signal
 	SignalConfidences      map[string]float64                      `json:"signal_confidences,omitempty"` // Real ML confidence scores per signal, e.g. "domain:economics" -> 0.81
@@ -106,15 +110,80 @@ type EvalResponse struct {
 	DecisionError          string                                  `json:"decision_error,omitempty"`
 }
 
+// WorkflowEvaluation describes a planned workflow without executing its tool.
+// Authorization is deliberately not inferred from prompt or API request data.
+type WorkflowEvaluation struct {
+	ContractVersion string                        `json:"contract_version"`
+	Type            string                        `json:"type"`
+	Status          string                        `json:"status"`
+	Authorization   WorkflowAuthorizationEvidence `json:"authorization"`
+	Tool            WorkflowToolPlan              `json:"tool"`
+	SynthesisModel  string                        `json:"synthesis_model,omitempty"`
+	ExecutesTools   bool                          `json:"executes_tools"`
+}
+
+type WorkflowAuthorizationEvidence struct {
+	RequiredGroup string `json:"required_group"`
+	Status        string `json:"status"`
+}
+
+type WorkflowToolPlan struct {
+	Type                  string `json:"type"`
+	Provider              string `json:"provider"`
+	MaxResults            int    `json:"max_results"`
+	TimeoutSeconds        int    `json:"timeout_seconds"`
+	MaxResponseBytes      int64  `json:"max_response_bytes"`
+	MaxEvidenceCharacters int    `json:"max_evidence_characters"`
+}
+
+type ModelEligibility struct {
+	CatalogVersion       string                      `json:"catalog_version"`
+	RequiredCapabilities []string                    `json:"required_capabilities,omitempty"`
+	EligibleModels       []string                    `json:"eligible_models,omitempty"`
+	ExcludedModels       []ModelEligibilityExclusion `json:"excluded_models,omitempty"`
+}
+
+type ModelEligibilityExclusion struct {
+	Model               string   `json:"model"`
+	Reasons             []string `json:"reasons"`
+	MissingCapabilities []string `json:"missing_capabilities,omitempty"`
+}
+
+// RequestCostEvaluation is a privacy-safe pre-execution estimate. It contains
+// token bounds and configured prices only, never provider-reported actual cost.
+type RequestCostEvaluation struct {
+	CatalogVersion  string                  `json:"catalog_version"`
+	Currency        string                  `json:"currency"`
+	InputTokens     int                     `json:"input_tokens"`
+	OutputTokens    int                     `json:"output_tokens"`
+	ReasoningTokens int                     `json:"reasoning_tokens,omitempty"`
+	MaxCost         float64                 `json:"max_cost"`
+	Candidates      []CandidateCostEstimate `json:"candidates"`
+}
+
+type CandidateCostEstimate struct {
+	Model         string  `json:"model"`
+	EstimatedCost float64 `json:"estimated_cost,omitempty"`
+	Eligible      bool    `json:"eligible"`
+	Status        string  `json:"status"`
+	PriceVersion  string  `json:"price_version,omitempty"`
+	PriceSource   string  `json:"price_source,omitempty"`
+	EffectiveAt   string  `json:"effective_at,omitempty"`
+	ExpiresAt     string  `json:"expires_at,omitempty"`
+}
+
 // EvalModelSelectionInput is the content-minimized selection contract passed
 // from classification to the live Router selector. It intentionally excludes
 // raw tool schemas and message bodies beyond the current semantic query.
 type EvalModelSelectionInput struct {
-	Recipe            config.RecipeName
-	Decision          *config.Decision
-	Query             string
-	Category          string
-	ContextTokenCount int
+	Recipe              config.RecipeName
+	Decision            *config.Decision
+	Query               string
+	Category            string
+	ContextTokenCount   int
+	InputTokenCount     int
+	OutputTokenBound    int
+	ReasoningTokenBound int
 }
 
 type EvalModelSelection struct {
@@ -122,6 +191,8 @@ type EvalModelSelection struct {
 	Status        string
 	Method        string
 	Reason        string
+	Eligibility   *ModelEligibility
+	Cost          *RequestCostEvaluation
 }
 
 // EvalModelSelector performs a non-generating selection preview with the same

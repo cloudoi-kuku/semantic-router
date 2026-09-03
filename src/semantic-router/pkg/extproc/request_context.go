@@ -143,6 +143,9 @@ type RequestContext struct {
 	VSRCacheTTLSeconds              int
 	VSRInjectedSystemPrompt         bool             // Whether a system prompt was injected into the request
 	VSRSelectedDecision             *config.Decision // The decision object selected by DecisionEngine (for plugins)
+	VSRWorkflowType                 string           // Selected provider-independent workflow type
+	VSRWorkflowStatus               string           // authorized, completed, or failed
+	VSRWorkflowEvidenceCount        int              // Number of normalized evidence items injected for synthesis
 	// VSREligibleModelRefs is the selected decision's model set after applying
 	// request contracts. Loopers consume this exact set; broader Router Learning
 	// candidate sets must independently apply the same request contracts.
@@ -169,6 +172,8 @@ type RequestContext struct {
 	VSRMatchedLanguage        []string // Matched language signals
 	VSRMatchedContext         []string // Matched context rule names (e.g. "low_token_count")
 	VSRContextTokenCount      int      // Conservative request-context token estimate used for routing
+	VSROutputTokenBound       int      // Caller-requested output ceiling used by pre-execution cost policy
+	VSRReasoningTokenBound    int      // Caller-requested reasoning ceiling used by pre-execution cost policy
 	VSRContextTextBytes       int      // Actual semantic-text bytes eligible for online text calibration
 	VSRContextEquivalentBytes int      // Content-free byte equivalent of the conservative routing floor
 	VSRContextHasNonText      bool     // Structured JSON or image reserves make text-only calibration unsafe

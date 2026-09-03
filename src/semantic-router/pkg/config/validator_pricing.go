@@ -5,9 +5,15 @@ import (
 	"math"
 	"regexp"
 	"strings"
+	"time"
 )
 
 var currencyCodePattern = regexp.MustCompile(`^[A-Z]{3}$`)
+
+const (
+	ProviderPricingCatalogVersion = "vllm-sr/provider-pricing/v1alpha1"
+	PricingUnitPerMillionTokens   = "per_1m_tokens"
+)
 
 // validateModelPricingContracts keeps operator-supplied cost metadata safe for
 // accounting and cost-aware selection. Pricing remains deployment metadata on
@@ -34,6 +40,13 @@ func validateModelPricing(modelName string, pricing ModelPricing) error {
 		)
 	}
 
+	if err := validateModelPricingRates(modelName, pricing); err != nil {
+		return err
+	}
+	return validateModelPricingProvenance(modelName, pricing)
+}
+
+func validateModelPricingRates(modelName string, pricing ModelPricing) error {
 	rates := []struct {
 		name  string
 		value float64
@@ -48,6 +61,12 @@ func validateModelPricing(modelName string, pricing ModelPricing) error {
 			value float64
 		}{name: "cache_write_per_1m", value: *pricing.CacheWritePer1M})
 	}
+	if pricing.ReasoningPer1M != nil {
+		rates = append(rates, struct {
+			name  string
+			value float64
+		}{name: "reasoning_per_1m", value: *pricing.ReasoningPer1M})
+	}
 
 	for _, rate := range rates {
 		if math.IsNaN(rate.value) || math.IsInf(rate.value, 0) || rate.value < 0 {
@@ -56,6 +75,30 @@ func validateModelPricing(modelName string, pricing ModelPricing) error {
 				modelName,
 				rate.name,
 			)
+		}
+	}
+	return nil
+}
+
+func validateModelPricingProvenance(modelName string, pricing ModelPricing) error {
+	if pricing.Unit != "" && pricing.Unit != PricingUnitPerMillionTokens {
+		return fmt.Errorf("providers.models[%s].pricing.unit must be %q", modelName, PricingUnitPerMillionTokens)
+	}
+	var effective time.Time
+	if pricing.EffectiveAt != "" {
+		parsed, err := time.Parse(time.RFC3339, pricing.EffectiveAt)
+		if err != nil {
+			return fmt.Errorf("providers.models[%s].pricing.effective_at must be RFC3339", modelName)
+		}
+		effective = parsed
+	}
+	if pricing.ExpiresAt != "" {
+		expires, err := time.Parse(time.RFC3339, pricing.ExpiresAt)
+		if err != nil {
+			return fmt.Errorf("providers.models[%s].pricing.expires_at must be RFC3339", modelName)
+		}
+		if !effective.IsZero() && !expires.After(effective) {
+			return fmt.Errorf("providers.models[%s].pricing.expires_at must be after effective_at", modelName)
 		}
 	}
 	return nil

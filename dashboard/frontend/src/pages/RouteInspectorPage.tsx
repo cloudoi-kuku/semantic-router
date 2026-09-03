@@ -155,6 +155,75 @@ const RouteInspectorPage: React.FC = () => {
                 </div>
               ) : null}
 
+              {result.eligibility ? (
+                <div className={styles.signalSection}>
+                  <h3>Model eligibility</h3>
+                  <p className={styles.muted}>{result.eligibility.catalog_version}</p>
+                  <div className={styles.signalList}>
+                    {(result.eligibility.required_capabilities || []).map((capability) => (
+                      <span className={styles.usedSignal} key={`required-${capability}`}>
+                        requires · {capability}
+                      </span>
+                    ))}
+                    {(result.eligibility.eligible_models || []).map((candidate) => (
+                      <span className={styles.matchedSignal} key={`eligible-${candidate}`}>
+                        eligible · {candidate}
+                      </span>
+                    ))}
+                  </div>
+                  {(result.eligibility.excluded_models || []).map((excluded) => (
+                    <p className={styles.muted} key={`excluded-${excluded.model}`}>
+                      Excluded {excluded.model}: {excluded.reasons.join(', ')}
+                      {excluded.missing_capabilities?.length
+                        ? ` (${excluded.missing_capabilities.join(', ')})`
+                        : ''}
+                    </p>
+                  ))}
+                </div>
+              ) : null}
+
+              {result.cost ? (
+                <div className={styles.signalSection}>
+                  <h3>Estimated request cost</h3>
+                  <p className={styles.muted}>{result.cost.catalog_version}</p>
+                  <p>
+                    Bound: {result.cost.input_tokens} input + {result.cost.output_tokens} output
+                    {result.cost.reasoning_tokens
+                      ? ` + ${result.cost.reasoning_tokens} reasoning`
+                      : ''}{' '}
+                    tokens; ceiling {result.cost.max_cost.toFixed(6)} {result.cost.currency}
+                  </p>
+                  {(result.cost.candidates || []).map((candidate) => (
+                    <p className={styles.muted} key={`cost-${candidate.model}`}>
+                      {candidate.model}: {candidate.estimated_cost?.toFixed(6) ?? 'unpriced'}{' '}
+                      {result.cost?.currency} ({candidate.status})
+                    </p>
+                  ))}
+                </div>
+              ) : null}
+
+              {result.workflow ? (
+                <div className={styles.signalSection}>
+                  <h3>Planned workflow</h3>
+                  <p className={styles.muted}>{result.workflow.contract_version}</p>
+                  <p>
+                    {result.workflow.type} via {result.workflow.tool.provider}; synthesis model{' '}
+                    {result.workflow.synthesis_model || 'not selected'}
+                  </p>
+                  <p className={styles.muted}>
+                    Authorization: {result.workflow.authorization.status}; required group{' '}
+                    {result.workflow.authorization.required_group}. Dry-run tool execution:{' '}
+                    {result.workflow.executes_tools ? 'yes' : 'no'}.
+                  </p>
+                  <p className={styles.muted}>
+                    Bounds: {result.workflow.tool.max_results} results,{' '}
+                    {result.workflow.tool.timeout_seconds}s timeout,{' '}
+                    {result.workflow.tool.max_response_bytes} response bytes,{' '}
+                    {result.workflow.tool.max_evidence_characters} evidence characters.
+                  </p>
+                </div>
+              ) : null}
+
               <div className={styles.signalSection}>
                 <h3>Signals</h3>
                 {[...usedSignals, ...matchedSignals].length > 0 ? (

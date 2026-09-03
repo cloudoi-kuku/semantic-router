@@ -206,6 +206,28 @@ func (d *decompiler) decompileDecision(dec config.Decision) {
 	if ruleExpr := decompileRuleNode(&dec.Rules); ruleExpr != "" {
 		d.write("  WHEN %s\n", ruleExpr)
 	}
+	if len(dec.RequiredCapabilities) > 0 {
+		d.write("  REQUIRES [")
+		for i, capability := range dec.RequiredCapabilities {
+			if i > 0 {
+				d.write(", ")
+			}
+			d.write("%q", capability)
+		}
+		d.write("]\n")
+	}
+	if budget := dec.RequestBudget; budget != nil {
+		d.write("  BUDGET { currency: %q, max_estimated_cost: %s, output_token_bound: %d, reasoning_token_bound: %d, require_pricing: %t, require_current_pricing: %t }\n",
+			budget.Currency, strconv.FormatFloat(budget.MaxEstimatedCost, 'f', -1, 64), budget.OutputTokenBound,
+			budget.ReasoningTokenBound, budget.RequirePricing, budget.RequireCurrentPricing)
+	}
+	if workflow := dec.Workflow; workflow != nil && workflow.WebSearch != nil {
+		search := workflow.WebSearch
+		d.write("  WORKFLOW { type: %q, authorization_group: %q, provider: %q, endpoint: %q, api_key_env: %q, api_key_header: %q, timeout_seconds: %d, max_results: %d, max_query_characters: %d, max_response_bytes: %d, max_evidence_characters: %d }\n",
+			workflow.Type, workflow.AuthorizationGroup, search.Provider, search.Endpoint,
+			search.APIKeyEnv, search.APIKeyHeader, search.TimeoutSeconds, search.MaxResults,
+			search.MaxQueryCharacters, search.MaxResponseBytes, search.MaxEvidenceCharacters)
+	}
 	if dec.Action != nil {
 		d.write("  ACTION %s %q\n", dec.Action.Type, dec.Action.Destination)
 	}

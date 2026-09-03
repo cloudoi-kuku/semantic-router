@@ -104,9 +104,11 @@ decision traces contain rule structure and signal names, not private request
 content. Additive fields may be introduced during `v1alpha1`; incompatible
 changes require a new schema version.
 
-Future revisions will add normalized task, required capabilities, workflow,
-policy disposition, confidence, cost estimate, latency estimate, and fallback
-plan. Fields must not claim evidence the router did not actually compute.
+The response now includes provider-neutral capability eligibility: catalogue
+version, required capabilities, eligible candidates, and bounded exclusion
+reasons. Future revisions will add normalized task, workflow, policy
+disposition, confidence, cost estimate, latency estimate, and fallback plan.
+Fields must not claim evidence the router did not actually compute.
 
 ### Dashboard inspection surface
 
@@ -120,18 +122,23 @@ provider or tool execution.
 
 ## Capability and Provider Abstraction
 
-Logical model entries must describe capabilities independently of provider and
-provider model ID. The initial catalogue should cover:
+Logical model entries describe capabilities independently of provider and
+provider model ID. Hard requirements use
+`vllm-sr/model-capability-catalog/v1alpha1` with these canonical IDs:
 
-- chat and instruction following;
-- advanced reasoning;
-- tool calling and parallel tool calling;
-- structured output and JSON schema;
-- context and output-token limits;
-- multimodal input;
-- supported regions and data-handling constraints;
-- expected latency and reliability tiers;
-- input, cached-input, output, and reasoning-token prices.
+- `chat`, `text`, and `reasoning`;
+- `tool_calling`, `parallel_tool_calling`, `structured_output`, and
+  `json_schema`;
+- `vision`, `audio`, `video`, and `file`;
+- `embeddings` and `image_generation`.
+
+Context-window limits remain numeric model-card metadata and are evaluated in
+the same eligibility stage. Region, data-handling, reliability, and price are
+separate policy/ranking dimensions rather than capability names. Model cards
+may retain additional descriptive values for compatibility, but a decision's
+`required_capabilities` accepts only the canonical vocabulary. A missing model
+card or missing capability fails closed only when the decision declares a hard
+requirement; routes without requirements preserve existing behavior.
 
 Eligibility is a hard filter. Ranking must never choose a cheap model that
 lacks a required capability. Provider adapters remain responsible for wire
@@ -153,6 +160,16 @@ A workflow declares required tools, allowed side effects, evidence handling,
 timeouts, retry limits, and eligible synthesis models. Search and retrieval
 results are untrusted inputs and must be delimited, size-bounded, provenance
 tagged, and protected against instruction injection.
+
+The implemented first workflow contract is
+`vllm-sr/workflow/v1alpha1`/`web_search_answer`. It uses a SearXNG-compatible
+adapter and requires membership in an operator-trusted authorization group.
+The runtime performs one GET search only after routing, model eligibility,
+budget, rate-limit, and cache checks. Query characters, timeout, result count,
+response bytes, and injected evidence characters are all bounded. Result URLs
+must be absolute HTTP(S) URLs; normalized evidence is delimited and explicitly
+marked untrusted before it is injected as a tool result for synthesis. Dry-run
+reports the workflow but performs neither authorization nor tool execution.
 
 ## Cost and Utility Model
 
@@ -181,6 +198,15 @@ Prices are versioned configuration inputs with currency, unit, source, and
 effective date. Estimated and provider-reported actual cost must remain
 separate. The main savings metric is actual routed cost compared with a named
 premium-only baseline, including router, retry, and tool overhead.
+
+The first implemented contract is
+`vllm-sr/provider-pricing/v1alpha1`. Provider entries pin source, version,
+`per_1m_tokens` unit, effective time, and expiry. A decision's
+`request_budget` supplies the currency, maximum estimated cost, and default
+output/reasoning bounds. Explicit request bounds replace those defaults.
+Missing, stale, wrong-currency, and over-budget candidates are excluded before
+ranking, and dry-run exposes all alternative estimates without executing a
+provider.
 
 ## Policy and Tenancy
 
@@ -284,9 +310,10 @@ classifier, and evaluation version so results remain reproducible.
 1. **Inspectable staging decision:** versioned, non-forwarding endpoint and
    dashboard inspector with privacy-safe explanations and exact routing parity.
 2. **Capability catalogue:** eligibility filtering independent of provider.
-3. **Cost estimation:** versioned prices, token estimates, budgets, and
-   alternative-cost comparison.
-4. **Workflow routing:** first web-search workflow, then generic MCP execution.
+3. **Cost estimation (implemented):** versioned prices, token estimates,
+   request budgets, and alternative-cost comparison.
+4. **Workflow routing (web search implemented):** authorized bounded SearXNG
+   evidence is available; generic MCP execution is next.
 5. **Resilience:** health-aware fallback, bounded escalation, and circuit
    breaking.
 6. **Evidence:** usage accounting, savings telemetry, quality outcomes, and
@@ -300,8 +327,8 @@ classifier, and evaluation version so results remain reproducible.
 
 - Whether the long-term public dry-run path remains under `/api/v1` or gains a
   data-plane `/v1` alias.
-- The first canonical capability vocabulary and compatibility policy.
-- Which price source and update process are authoritative.
+- Which automated review/update process should replace the initial pinned
+  official provider sources before their configured expiry.
 - Whether workflow execution belongs in this process or a separately isolated
   worker.
 - Which quality signals are cheap and reliable enough for online escalation.

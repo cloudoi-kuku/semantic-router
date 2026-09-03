@@ -2,9 +2,12 @@
 
 import json
 import math
+import re
 import warnings
+from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Literal, Optional
+from urllib.parse import urlparse
 
 from pydantic import (
     BaseModel,
@@ -25,6 +28,21 @@ from .config_contract import (
 )
 
 RoutingStrategy = Literal["priority", "confidence"]
+RequiredModelCapability = Literal[
+    "chat",
+    "text",
+    "reasoning",
+    "tool_calling",
+    "parallel_tool_calling",
+    "structured_output",
+    "json_schema",
+    "vision",
+    "audio",
+    "video",
+    "file",
+    "embeddings",
+    "image_generation",
+]
 LOCAL_CLASSIFIER_LABEL_COUNT = 2
 SEQUENCE_CLASSIFIER_MIN_LABEL_COUNT = 2
 PROMPT_MIN_CANDIDATES = 2
@@ -1526,6 +1544,72 @@ class DecisionAction(BaseModel):
         return self
 
 
+class RequestBudget(BaseModel):
+    """Pre-execution request cost ceiling for one routing decision."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    currency: str = Field(pattern=r"^[A-Z]{3}$")
+    max_estimated_cost: float = Field(gt=0, allow_inf_nan=False)
+    output_token_bound: int = Field(gt=0)
+    reasoning_token_bound: int = Field(default=0, ge=0)
+    require_pricing: bool = False
+    require_current_pricing: bool = False
+
+    @model_validator(mode="after")
+    def validate_current_pricing(self):
+        if self.require_current_pricing and not self.require_pricing:
+            raise ValueError("require_current_pricing requires require_pricing")
+        return self
+
+
+class WebSearchWorkflow(BaseModel):
+    """Bounded SearXNG adapter configuration for web-search evidence."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    provider: Literal["searxng"]
+    endpoint: str
+    api_key_env: Optional[str] = Field(default=None, pattern=r"^[A-Z][A-Z0-9_]*$")
+    api_key_header: Optional[str] = None
+    timeout_seconds: int = Field(ge=1, le=30)
+    max_results: int = Field(ge=1, le=10)
+    max_query_characters: int = Field(ge=1, le=2000)
+    max_response_bytes: int = Field(ge=1024, le=4 * 1024 * 1024)
+    max_evidence_characters: int = Field(ge=128, le=20000)
+
+    @model_validator(mode="after")
+    def validate_endpoint_and_secret_header(self):
+        endpoint = self.endpoint
+        reference = re.fullmatch(r"\$\{[A-Z][A-Z0-9_]*(?::-(.+))?\}", endpoint)
+        if reference and reference.group(1):
+            endpoint = reference.group(1)
+        parsed = urlparse(endpoint)
+        if not reference and (
+            parsed.scheme not in ("http", "https") or not parsed.netloc
+        ):
+            raise ValueError("endpoint must be an absolute HTTP(S) URL")
+        if (
+            reference
+            and reference.group(1)
+            and (parsed.scheme not in ("http", "https") or not parsed.netloc)
+        ):
+            raise ValueError("endpoint must be an absolute HTTP(S) URL")
+        if self.api_key_env and not (self.api_key_header or "").strip():
+            raise ValueError("api_key_header is required when api_key_env is set")
+        return self
+
+
+class WorkflowConfig(BaseModel):
+    """Authorized provider-independent workflow selected before synthesis."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    type: Literal["web_search_answer"]
+    authorization_group: str = Field(min_length=1)
+    web_search: WebSearchWorkflow
+
+
 class Decision(BaseModel):
     """Routing decision configuration."""
 
@@ -1539,6 +1623,9 @@ class Decision(BaseModel):
     # This mirrors the Go runtime and the DSL `ROUTE` form without `WHEN`.
     rules: Rules = Field(default_factory=Rules)
     action: Optional[DecisionAction] = None
+    required_capabilities: List[RequiredModelCapability] = Field(default_factory=list)
+    request_budget: Optional[RequestBudget] = None
+    workflow: Optional[WorkflowConfig] = None
     output_contract: Optional[str] = None
     output_contract_spec: Optional[OutputContractSpec] = None
     modelRefs: List[ModelRef] = Field(alias="modelRefs")
@@ -1615,11 +1702,27 @@ class ModelPricing(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
+    version: Optional[str] = None
+    source: Optional[str] = None
+    unit: Optional[Literal["per_1m_tokens"]] = None
+    effective_at: Optional[datetime] = None
+    expires_at: Optional[datetime] = None
     currency: Optional[str] = Field(default="USD", pattern=r"^[A-Z]{3}$")
     prompt_per_1m: Optional[float] = Field(default=0.0, ge=0, allow_inf_nan=False)
     cached_input_per_1m: Optional[float] = Field(default=0.0, ge=0, allow_inf_nan=False)
     cache_write_per_1m: Optional[float] = Field(default=None, ge=0, allow_inf_nan=False)
     completion_per_1m: Optional[float] = Field(default=0.0, ge=0, allow_inf_nan=False)
+    reasoning_per_1m: Optional[float] = Field(default=None, ge=0, allow_inf_nan=False)
+
+    @model_validator(mode="after")
+    def validate_pricing_window(self):
+        if (
+            self.effective_at
+            and self.expires_at
+            and self.expires_at <= self.effective_at
+        ):
+            raise ValueError("expires_at must be after effective_at")
+        return self
 
 
 class ProviderReliability(BaseModel):

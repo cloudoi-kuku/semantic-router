@@ -68,6 +68,11 @@ const loraFields: ObjectEditorField<LoRAAdapter>[] = [
 ]
 
 const pricingFields: ObjectEditorField<ModelPricing>[] = [
+  { key: 'version', label: 'Price version', placeholder: '2026-09-03' },
+  { key: 'source', label: 'Authoritative source', placeholder: 'https://provider.example/pricing' },
+  { key: 'unit', label: 'Unit', type: 'select', options: ['per_1m_tokens'] },
+  { key: 'effective_at', label: 'Effective at (RFC3339)', placeholder: '2026-09-03T00:00:00Z' },
+  { key: 'expires_at', label: 'Expires at (RFC3339)', placeholder: '2026-12-03T00:00:00Z' },
   { key: 'currency', label: 'Currency', placeholder: 'USD' },
   {
     key: 'prompt_per_1m',
@@ -96,6 +101,14 @@ const pricingFields: ObjectEditorField<ModelPricing>[] = [
   {
     key: 'completion_per_1m',
     label: 'Completion / 1M',
+    type: 'number',
+    min: 0,
+    step: 0.0001,
+    placeholder: '1.50',
+  },
+  {
+    key: 'reasoning_per_1m',
+    label: 'Reasoning / 1M',
     type: 'number',
     min: 0,
     step: 0.0001,

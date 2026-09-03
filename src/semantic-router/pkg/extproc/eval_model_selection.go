@@ -3,6 +3,7 @@ package extproc
 import (
 	"context"
 	"strings"
+	"time"
 
 	"github.com/vllm-project/semantic-router/src/semantic-router/pkg/config"
 	"github.com/vllm-project/semantic-router/src/semantic-router/pkg/selection"
@@ -15,19 +16,47 @@ import (
 // list ordering that Eval can honestly present as final.
 func (r *OpenAIRouter) SelectModelForEval(
 	input services.EvalModelSelectionInput,
-) services.EvalModelSelection {
+) (selectionResult services.EvalModelSelection) {
 	decision := input.Decision
 	if r == nil || r.Config == nil || decision == nil {
 		return evalSelectionUnavailable("router selection runtime is unavailable")
 	}
-	if r.contextIneligibleAlgorithmModelCount(decision, input.ContextTokenCount) > 0 {
-		return evalSelectionUnavailable("an explicitly configured algorithm model cannot satisfy the request context")
+	eligibilityResult := r.eligibleModelRefs(
+		decision.ModelRefs,
+		decision.RequiredCapabilities,
+		input.ContextTokenCount,
+	)
+	eligibility := &services.ModelEligibility{
+		CatalogVersion:       config.ModelCapabilityCatalogVersion,
+		RequiredCapabilities: append([]string(nil), decision.RequiredCapabilities...),
+		EligibleModels:       modelRefNames(eligibilityResult.eligible),
+		ExcludedModels:       append([]services.ModelEligibilityExclusion(nil), eligibilityResult.exclusions...),
 	}
-	eligibleModelRefs, excluded := r.contextEligibleModelRefs(decision.ModelRefs, input.ContextTokenCount)
-	if len(eligibleModelRefs) == 0 && excluded > 0 {
-		return evalSelectionUnavailable("no decision model can satisfy the request context")
+	var cost *services.RequestCostEvaluation
+	defer func() {
+		selectionResult.Eligibility = eligibility
+		selectionResult.Cost = cost
+	}()
+	if reason := r.evalExplicitModelIneligibilityReason(decision, input); reason != "" {
+		return evalSelectionUnavailable(reason)
 	}
-	if excluded > 0 {
+	eligibleModelRefs := eligibilityResult.eligible
+	budgetResult := r.requestBudgetEligibleModelRefs(
+		eligibleModelRefs,
+		decision.RequestBudget,
+		input.InputTokenCount,
+		input.OutputTokenBound,
+		input.ReasoningTokenBound,
+		time.Now().UTC(),
+	)
+	cost = budgetResult.evaluation
+	eligibleModelRefs = budgetResult.eligible
+	eligibility.EligibleModels = modelRefNames(eligibleModelRefs)
+	eligibility.ExcludedModels = append(eligibility.ExcludedModels, budgetResult.exclusions...)
+	if reason := evalNoEligibleModelReason(eligibleModelRefs, eligibilityResult, decision.RequestBudget); reason != "" {
+		return evalSelectionUnavailable(reason)
+	}
+	if len(eligibility.ExcludedModels) > 0 {
 		eligibleDecision := *decision
 		eligibleDecision.ModelRefs = eligibleModelRefs
 		decision = &eligibleDecision
@@ -53,6 +82,51 @@ func (r *OpenAIRouter) SelectModelForEval(
 		}
 	}
 	return r.selectEvalCandidate(input, decision, method)
+}
+
+func evalNoEligibleModelReason(
+	eligible []config.ModelRef,
+	base modelEligibilityResult,
+	budget *config.RequestBudget,
+) string {
+	if len(eligible) > 0 {
+		return ""
+	}
+	if len(base.exclusions) > 0 {
+		return "no decision model can satisfy context and capability requirements"
+	}
+	if budget != nil {
+		return "no decision model can satisfy the request budget"
+	}
+	return ""
+}
+
+func (r *OpenAIRouter) evalExplicitModelIneligibilityReason(
+	decision *config.Decision,
+	input services.EvalModelSelectionInput,
+) string {
+	if r.contextIneligibleAlgorithmModelCount(decision, input.ContextTokenCount) > 0 {
+		return "an explicitly configured algorithm model cannot satisfy the request context"
+	}
+	if r.capabilityIneligibleAlgorithmModelCount(decision) > 0 {
+		return "an explicitly configured algorithm model is missing required capabilities"
+	}
+	if r.requestBudgetIneligibleAlgorithmModelCount(
+		decision, input.ContextTokenCount, input.OutputTokenBound, input.ReasoningTokenBound, time.Now().UTC(),
+	) > 0 {
+		return "an explicitly configured algorithm model cannot satisfy the request budget"
+	}
+	return ""
+}
+
+func modelRefNames(refs []config.ModelRef) []string {
+	names := make([]string, 0, len(refs))
+	for _, ref := range refs {
+		if name := strings.TrimSpace(ref.Model); name != "" {
+			names = append(names, name)
+		}
+	}
+	return names
 }
 
 func evalAlgorithmType(decision *config.Decision) string {

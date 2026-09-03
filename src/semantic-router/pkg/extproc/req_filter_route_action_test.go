@@ -80,6 +80,26 @@ func TestDecisionRouteActionFallsBackToEligibleCandidate(t *testing.T) {
 	assert.Equal(t, "large-safe-model", destination)
 }
 
+func TestDecisionRouteActionFallsBackWhenDestinationLacksCapability(t *testing.T) {
+	router := &OpenAIRouter{Config: &config.RouterConfig{BackendModels: config.BackendModels{
+		ModelConfig: map[string]config.ModelParams{
+			"safe-model":      {Capabilities: []string{"chat"}},
+			"safe-tool-model": {Capabilities: []string{"chat", "tool_calling"}},
+		},
+	}}}
+	decisionConfig := guardDecision(
+		routeAction("safe-model"),
+		config.ModelRef{Model: "safe-tool-model"},
+	)
+	decisionConfig.RequiredCapabilities = []string{"chat", "tool_calling"}
+
+	destination, terminal, err := router.decisionRouteActionDestination(decisionConfig, &RequestContext{})
+
+	assert.NoError(t, err)
+	assert.True(t, terminal)
+	assert.Equal(t, "safe-tool-model", destination)
+}
+
 func TestDecisionRouteActionFailsClosedWithoutEligibleModel(t *testing.T) {
 	router := routeActionRouter(map[string]int{"safe-model": 100, "small-safe-model": 100})
 	ctx := &RequestContext{VSRContextTokenCount: 200}

@@ -32,11 +32,20 @@ func TestPopulateEvalModelSelectionReturnsConcreteRuntimeChoice(t *testing.T) {
 	matchedDecision := &config.Decision{
 		Name:      "balanced-route",
 		ModelRefs: []config.ModelRef{{Model: "model-a"}, {Model: "model-b"}},
+		Workflow: &config.WorkflowConfig{
+			Type: config.WorkflowWebSearchAnswer, AuthorizationGroup: "web-search-users",
+			WebSearch: &config.WebSearchWorkflowConfig{
+				Provider: config.WebSearchProviderSearXNG, Endpoint: "https://search.example.com/search",
+				TimeoutSeconds: 5, MaxResults: 4, MaxQueryCharacters: 500,
+				MaxResponseBytes: 262144, MaxEvidenceCharacters: 8000,
+			},
+		},
 	}
 	service.populateEvalModelSelection(
 		response,
 		intentSignalInput{
 			currentUserText: "Explain the tradeoff.",
+			inputTokenFloor: 3072,
 			requestFacts: classification.RequestFacts{
 				ContextTokenFloor: 4096,
 			},
@@ -45,11 +54,33 @@ func TestPopulateEvalModelSelectionReturnsConcreteRuntimeChoice(t *testing.T) {
 			Decision:     matchedDecision,
 			MatchedRules: []string{"domain:engineering"},
 		},
+		0,
+		0,
 	)
+	assertConcreteRuntimeChoice(t, selector, response, matchedDecision)
+}
 
+func assertConcreteRuntimeChoice(
+	t *testing.T,
+	selector *evalModelSelectorStub,
+	response *EvalResponse,
+	matchedDecision *config.Decision,
+) {
+	t.Helper()
+	assertEvalSelection(t, response)
+	assertEvalSelectorInput(t, selector, matchedDecision)
+	assertEvalWorkflow(t, response)
+}
+
+func assertEvalSelection(t *testing.T, response *EvalResponse) {
+	t.Helper()
 	if response.SelectedModel != "model-b" || response.SelectionStatus != EvalSelectionSelected {
 		t.Fatalf("selection response = %+v", response)
 	}
+}
+
+func assertEvalSelectorInput(t *testing.T, selector *evalModelSelectorStub, matchedDecision *config.Decision) {
+	t.Helper()
 	if selector.input.Decision != matchedDecision || selector.input.Recipe != "balanced" {
 		t.Fatalf("selector scope = %+v", selector.input)
 	}
@@ -58,6 +89,19 @@ func TestPopulateEvalModelSelectionReturnsConcreteRuntimeChoice(t *testing.T) {
 	}
 	if selector.input.ContextTokenCount != 4096 {
 		t.Fatalf("selector context count = %d", selector.input.ContextTokenCount)
+	}
+	if selector.input.InputTokenCount != 3072 {
+		t.Fatalf("selector input token count = %d", selector.input.InputTokenCount)
+	}
+}
+
+func assertEvalWorkflow(t *testing.T, response *EvalResponse) {
+	t.Helper()
+	if response.Workflow == nil || response.Workflow.Status != "planned" || response.Workflow.ExecutesTools {
+		t.Fatalf("dry-run workflow = %+v", response.Workflow)
+	}
+	if response.Workflow.Authorization.Status != "not_evaluated" || response.Workflow.SynthesisModel != "model-b" {
+		t.Fatalf("dry-run workflow evidence = %+v", response.Workflow)
 	}
 }
 
@@ -71,6 +115,8 @@ func TestPopulateEvalModelSelectionDoesNotInventFirstRecommendedModel(t *testing
 			Name:      "fusion-route",
 			ModelRefs: []config.ModelRef{{Model: "model-a"}, {Model: "model-b"}},
 		}},
+		0,
+		0,
 	)
 
 	if response.SelectedModel != "" || response.SelectionStatus != EvalSelectionUnavailable {

@@ -16,13 +16,16 @@ const routingDecisionSchemaVersion = "vllm-sr/routing-decision/v1alpha1"
 // RoutingDecisionEnvelope is the privacy-minimized, non-generating routing
 // preview returned to products integrating with the Router.
 type RoutingDecisionEnvelope struct {
-	SchemaVersion string                     `json:"schema_version"`
-	DryRun        bool                       `json:"dry_run"`
-	Route         RoutingDecisionRoute       `json:"route"`
-	Selection     RoutingDecisionSelection   `json:"selection"`
-	Signals       RoutingDecisionSignals     `json:"signals"`
-	Diagnostics   RoutingDecisionDiagnostics `json:"diagnostics,omitempty"`
-	Trace         []decision.DecisionTrace   `json:"trace,omitempty"`
+	SchemaVersion string                          `json:"schema_version"`
+	DryRun        bool                            `json:"dry_run"`
+	Route         RoutingDecisionRoute            `json:"route"`
+	Selection     RoutingDecisionSelection        `json:"selection"`
+	Eligibility   *services.ModelEligibility      `json:"eligibility,omitempty"`
+	Cost          *services.RequestCostEvaluation `json:"cost,omitempty"`
+	Workflow      *services.WorkflowEvaluation    `json:"workflow,omitempty"`
+	Signals       RoutingDecisionSignals          `json:"signals"`
+	Diagnostics   RoutingDecisionDiagnostics      `json:"diagnostics,omitempty"`
+	Trace         []decision.DecisionTrace        `json:"trace,omitempty"`
 }
 
 type RoutingDecisionRoute struct {
@@ -108,6 +111,9 @@ func newRoutingDecisionEnvelope(evaluated *services.EvalResponse) RoutingDecisio
 			CandidateModels: append([]string(nil), evaluated.RecommendedModels...),
 			Reason:          evaluated.SelectionReason,
 		},
+		Eligibility: evaluated.Eligibility,
+		Cost:        evaluated.Cost,
+		Workflow:    evaluated.Workflow,
 		Signals: RoutingDecisionSignals{
 			Confidences: evaluated.SignalConfidences,
 			Values:      evaluated.SignalValues,

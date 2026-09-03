@@ -115,16 +115,42 @@ type SignalDeclJSON struct {
 
 // RouteDeclJSON is the JSON form of RouteDecl.
 type RouteDeclJSON struct {
-	Name        string           `json:"name"`
-	Description string           `json:"description,omitempty"`
-	Priority    int              `json:"priority"`
-	Tier        int              `json:"tier,omitempty"`
-	When        *BoolExprJSON    `json:"when,omitempty"`
-	Models      []*ModelRefJSON  `json:"models"`
-	Algorithm   *AlgoSpecJSON    `json:"algorithm,omitempty"`
-	Plugins     []*PluginRefJSON `json:"plugins"`
-	Emits       []*EmitDeclJSON  `json:"emits,omitempty"`
-	Pos         Position         `json:"pos"`
+	Name                 string                 `json:"name"`
+	Description          string                 `json:"description,omitempty"`
+	Priority             int                    `json:"priority"`
+	Tier                 int                    `json:"tier,omitempty"`
+	When                 *BoolExprJSON          `json:"when,omitempty"`
+	RequiredCapabilities []string               `json:"requiredCapabilities,omitempty"`
+	RequestBudget        *RequestBudgetDeclJSON `json:"requestBudget,omitempty"`
+	Workflow             *WorkflowDeclJSON      `json:"workflow,omitempty"`
+	Models               []*ModelRefJSON        `json:"models"`
+	Algorithm            *AlgoSpecJSON          `json:"algorithm,omitempty"`
+	Plugins              []*PluginRefJSON       `json:"plugins"`
+	Emits                []*EmitDeclJSON        `json:"emits,omitempty"`
+	Pos                  Position               `json:"pos"`
+}
+
+type RequestBudgetDeclJSON struct {
+	Currency              string  `json:"currency"`
+	MaxEstimatedCost      float64 `json:"maxEstimatedCost"`
+	OutputTokenBound      int     `json:"outputTokenBound"`
+	ReasoningTokenBound   int     `json:"reasoningTokenBound,omitempty"`
+	RequirePricing        bool    `json:"requirePricing,omitempty"`
+	RequireCurrentPricing bool    `json:"requireCurrentPricing,omitempty"`
+}
+
+type WorkflowDeclJSON struct {
+	Type                  string `json:"type"`
+	AuthorizationGroup    string `json:"authorizationGroup"`
+	Provider              string `json:"provider"`
+	Endpoint              string `json:"endpoint"`
+	APIKeyEnv             string `json:"apiKeyEnv,omitempty"`
+	APIKeyHeader          string `json:"apiKeyHeader,omitempty"`
+	TimeoutSeconds        int    `json:"timeoutSeconds"`
+	MaxResults            int    `json:"maxResults"`
+	MaxQueryCharacters    int    `json:"maxQueryCharacters"`
+	MaxResponseBytes      int    `json:"maxResponseBytes"`
+	MaxEvidenceCharacters int    `json:"maxEvidenceCharacters"`
 }
 
 // EmitDeclJSON is the JSON form of an EMIT directive on a route.
@@ -394,14 +420,32 @@ func appendTestBlockDecls(result *ProgramJSON, blocks []*TestBlockDecl) {
 
 func routeDeclToJSON(r *RouteDecl) *RouteDeclJSON {
 	rj := &RouteDeclJSON{
-		Name:        r.Name,
-		Description: r.Description,
-		Priority:    r.Priority,
-		Tier:        r.Tier,
-		When:        marshalBoolExpr(r.When),
-		Models:      make([]*ModelRefJSON, 0, len(r.Models)),
-		Plugins:     make([]*PluginRefJSON, 0, len(r.Plugins)),
-		Pos:         r.Pos,
+		Name:                 r.Name,
+		Description:          r.Description,
+		Priority:             r.Priority,
+		Tier:                 r.Tier,
+		When:                 marshalBoolExpr(r.When),
+		RequiredCapabilities: append([]string(nil), r.RequiredCapabilities...),
+		Models:               make([]*ModelRefJSON, 0, len(r.Models)),
+		Plugins:              make([]*PluginRefJSON, 0, len(r.Plugins)),
+		Pos:                  r.Pos,
+	}
+	if r.RequestBudget != nil {
+		rj.RequestBudget = &RequestBudgetDeclJSON{
+			Currency: r.RequestBudget.Currency, MaxEstimatedCost: r.RequestBudget.MaxEstimatedCost,
+			OutputTokenBound: r.RequestBudget.OutputTokenBound, ReasoningTokenBound: r.RequestBudget.ReasoningTokenBound,
+			RequirePricing: r.RequestBudget.RequirePricing, RequireCurrentPricing: r.RequestBudget.RequireCurrentPricing,
+		}
+	}
+	if r.Workflow != nil {
+		rj.Workflow = &WorkflowDeclJSON{
+			Type: r.Workflow.Type, AuthorizationGroup: r.Workflow.AuthorizationGroup,
+			Provider: r.Workflow.Provider, Endpoint: r.Workflow.Endpoint,
+			APIKeyEnv: r.Workflow.APIKeyEnv, APIKeyHeader: r.Workflow.APIKeyHeader,
+			TimeoutSeconds: r.Workflow.TimeoutSeconds, MaxResults: r.Workflow.MaxResults,
+			MaxQueryCharacters: r.Workflow.MaxQueryCharacters, MaxResponseBytes: r.Workflow.MaxResponseBytes,
+			MaxEvidenceCharacters: r.Workflow.MaxEvidenceCharacters,
+		}
 	}
 	for _, m := range r.Models {
 		rj.Models = append(rj.Models, &ModelRefJSON{

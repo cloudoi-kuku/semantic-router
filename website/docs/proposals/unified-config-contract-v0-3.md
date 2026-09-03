@@ -46,12 +46,38 @@ silently translated at runtime.
 `providers.defaults` owns the default provider behavior and default model.
 `providers.models[].backend_refs[]` owns physical backend bindings.
 `providers.models[].pricing` owns optional deployment cost metadata used by
-cost-aware selection and accounting. Pricing does not belong to routing model cards.
+cost-aware selection and accounting. The provider-pricing v1alpha1 contract
+adds `version`, `source`, the fixed `per_1m_tokens` unit, `effective_at`, and
+`expires_at`; pricing does not belong to routing model cards.
 
 `routing.modelCards` describes routing-facing model identity. Optional
 `routing.modelCards[].loras` declare LoRA adapters that decisions may select with
 `lora_name`. Signals and decisions reference logical model names, not endpoints or
 credentials.
+
+Decisions may declare `required_capabilities`. The router applies these as a
+hard eligibility filter against `routing.modelCards[].capabilities` before
+selection. The versioned v1alpha1 vocabulary is `chat`, `text`, `reasoning`,
+`tool_calling`, `parallel_tool_calling`, `structured_output`, `json_schema`,
+`vision`, `audio`, `video`, `file`, `embeddings`, and `image_generation`.
+Additional model-card values remain
+descriptive and backward compatible; only the canonical values can be used as
+hard requirements.
+
+Decisions may also declare `request_budget`. Its currency, maximum estimated
+cost, and default output/reasoning token bounds form a hard pre-execution
+policy. Explicit request token ceilings replace the configured defaults for
+that request. `require_pricing` and `require_current_pricing` provide
+fail-closed behavior before an algorithm ranks the remaining candidates.
+
+The optional decision-level `workflow` runs after routing, eligibility, budget,
+rate-limit, and cache checks but before synthesis. The first contract is
+`vllm-sr/workflow/v1alpha1` with `type: web_search_answer`. It requires an
+operator-trusted authorization group and a SearXNG adapter with explicit query,
+timeout, result, response-byte, and evidence-character limits. Search evidence
+is normalized, URL-validated, provenance tagged, marked untrusted, and injected
+as a tool result. Dry-run reports the plan and never evaluates caller authority
+or executes the search endpoint.
 
 ## Routing and DSL boundary
 
@@ -59,7 +85,8 @@ Routing owns:
 
 - model cards;
 - named signals and projections;
-- decisions, candidate `modelRefs`, algorithms, and plugins;
+- decisions, hard `required_capabilities`, request budgets, workflows, candidate
+  `modelRefs`, algorithms, and plugins;
 - route-local output and adaptation policy.
 
 Algorithms may declare `minimum_candidates` as a portable Recipe contract.

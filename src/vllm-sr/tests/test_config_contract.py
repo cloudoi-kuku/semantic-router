@@ -128,6 +128,108 @@ def test_decision_without_rules_is_a_match_all_fallback():
     assert decision.rules.conditions == []
 
 
+def test_decision_accepts_only_canonical_required_model_capabilities():
+    decision = Decision(
+        name="reasoning",
+        priority=10,
+        required_capabilities=["chat", "reasoning"],
+        modelRefs=[{"model": "model-a", "use_reasoning": True}],
+    )
+    assert decision.required_capabilities == ["chat", "reasoning"]
+
+    with pytest.raises(ValueError, match="required_capabilities"):
+        Decision(
+            name="legacy-tool-name",
+            priority=10,
+            required_capabilities=["tool-use"],
+            modelRefs=[{"model": "model-a", "use_reasoning": False}],
+        )
+
+
+def test_decision_accepts_request_budget_and_rejects_unsafe_freshness_policy():
+    decision = Decision(
+        name="economical",
+        priority=10,
+        request_budget={
+            "currency": "USD",
+            "max_estimated_cost": 0.01,
+            "output_token_bound": 1024,
+            "require_pricing": True,
+            "require_current_pricing": True,
+        },
+        modelRefs=[{"model": "model-a", "use_reasoning": False}],
+    )
+    assert decision.request_budget is not None
+    assert decision.request_budget.max_estimated_cost == 0.01
+
+    with pytest.raises(ValueError, match="requires require_pricing"):
+        Decision(
+            name="unsafe",
+            priority=10,
+            request_budget={
+                "currency": "USD",
+                "max_estimated_cost": 0.01,
+                "output_token_bound": 1024,
+                "require_current_pricing": True,
+            },
+            modelRefs=[{"model": "model-a", "use_reasoning": False}],
+        )
+
+
+def test_decision_accepts_bounded_authorized_web_search_workflow():
+    decision = Decision(
+        name="fresh",
+        priority=20,
+        workflow={
+            "type": "web_search_answer",
+            "authorization_group": "web-search-users",
+            "web_search": {
+                "provider": "searxng",
+                "endpoint": "https://search.example.com/search",
+                "api_key_env": "WEB_SEARCH_API_KEY",
+                "api_key_header": "X-Search-Token",
+                "timeout_seconds": 5,
+                "max_results": 5,
+                "max_query_characters": 500,
+                "max_response_bytes": 262144,
+                "max_evidence_characters": 8000,
+            },
+        },
+        modelRefs=[{"model": "model-a", "use_reasoning": False}],
+    )
+    assert decision.workflow is not None
+    assert decision.workflow.web_search.provider == "searxng"
+
+    interpolated = type(decision.workflow.web_search)(
+        **{
+            **decision.workflow.web_search.model_dump(),
+            "endpoint": "${SEARCH_ENDPOINT:-http://search:8080/search}",
+        }
+    )
+    assert interpolated.endpoint.startswith("${SEARCH_ENDPOINT")
+
+    with pytest.raises(ValueError, match="api_key_header"):
+        Decision(
+            name="unsafe-search",
+            priority=20,
+            workflow={
+                "type": "web_search_answer",
+                "authorization_group": "web-search-users",
+                "web_search": {
+                    "provider": "searxng",
+                    "endpoint": "https://search.example.com/search",
+                    "api_key_env": "WEB_SEARCH_API_KEY",
+                    "timeout_seconds": 5,
+                    "max_results": 5,
+                    "max_query_characters": 500,
+                    "max_response_bytes": 262144,
+                    "max_evidence_characters": 8000,
+                },
+            },
+            modelRefs=[{"model": "model-a", "use_reasoning": False}],
+        )
+
+
 def test_decision_enforces_minimum_candidates_after_materialization():
     with pytest.raises(ValueError, match="minimum_candidates=2"):
         Decision(

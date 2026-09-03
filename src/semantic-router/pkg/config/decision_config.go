@@ -29,6 +29,12 @@ func UnknownPolicyChoices() string {
 
 const DecisionActionRoute = "route"
 
+const (
+	WorkflowContractVersion  = "vllm-sr/workflow/v1alpha1"
+	WorkflowWebSearchAnswer  = "web_search_answer"
+	WebSearchProviderSearXNG = "searxng"
+)
+
 // DecisionAction is an explicit action a matched decision applies instead of
 // candidate ranking. The only supported type is "route": send the request to
 // Destination, overriding a caller-pinned model, so a detected prompt attack
@@ -41,19 +47,22 @@ type DecisionAction struct {
 
 // Decision represents a routing decision that combines multiple rules with boolean logic.
 type Decision struct {
-	Name                string                     `yaml:"name"`
-	Description         string                     `yaml:"description,omitempty"`
-	Priority            int                        `yaml:"priority,omitempty"`
-	Tier                int                        `yaml:"tier,omitempty"`
-	OutputContract      string                     `yaml:"output_contract,omitempty" json:"output_contract,omitempty"`
-	OutputContractSpec  *OutputContractSpec        `yaml:"output_contract_spec,omitempty" json:"output_contract_spec,omitempty"`
-	Rules               RuleCombination            `yaml:"rules"`
-	Action              *DecisionAction            `yaml:"action,omitempty" json:"action,omitempty"`
-	ModelRefs           []ModelRef                 `yaml:"modelRefs,omitempty"`
-	Algorithm           *AlgorithmConfig           `yaml:"algorithm,omitempty"`
-	Adaptations         DecisionAdaptationsConfig  `yaml:"adaptations,omitempty"`
-	Plugins             []DecisionPlugin           `yaml:"plugins,omitempty"`
-	CandidateIterations []CandidateIterationConfig `yaml:"candidateIterations,omitempty"`
+	Name                 string                     `yaml:"name"`
+	Description          string                     `yaml:"description,omitempty"`
+	Priority             int                        `yaml:"priority,omitempty"`
+	Tier                 int                        `yaml:"tier,omitempty"`
+	OutputContract       string                     `yaml:"output_contract,omitempty" json:"output_contract,omitempty"`
+	OutputContractSpec   *OutputContractSpec        `yaml:"output_contract_spec,omitempty" json:"output_contract_spec,omitempty"`
+	Rules                RuleCombination            `yaml:"rules"`
+	Action               *DecisionAction            `yaml:"action,omitempty" json:"action,omitempty"`
+	RequiredCapabilities []string                   `yaml:"required_capabilities,omitempty" json:"required_capabilities,omitempty"`
+	RequestBudget        *RequestBudget             `yaml:"request_budget,omitempty" json:"request_budget,omitempty"`
+	Workflow             *WorkflowConfig            `yaml:"workflow,omitempty" json:"workflow,omitempty"`
+	ModelRefs            []ModelRef                 `yaml:"modelRefs,omitempty"`
+	Algorithm            *AlgorithmConfig           `yaml:"algorithm,omitempty"`
+	Adaptations          DecisionAdaptationsConfig  `yaml:"adaptations,omitempty"`
+	Plugins              []DecisionPlugin           `yaml:"plugins,omitempty"`
+	CandidateIterations  []CandidateIterationConfig `yaml:"candidateIterations,omitempty"`
 	// Emits carries declarative side-effect directives produced by EMIT blocks
 	// inside the matching decision branch. The slice preserves DSL declaration
 	// order so round-trip decompilation stays stable.
@@ -61,6 +70,40 @@ type Decision struct {
 	// Annotations carries bounded, non-executable decision metadata for replay
 	// and transport projections. Executable behavior belongs in Emits or Plugins.
 	Annotations map[string]interface{} `yaml:"annotations,omitempty" json:"annotations,omitempty"`
+}
+
+// WorkflowConfig selects an authorized, bounded execution path before model
+// synthesis. The initial contract supports public web-search evidence only.
+type WorkflowConfig struct {
+	Type               string                   `yaml:"type" json:"type"`
+	AuthorizationGroup string                   `yaml:"authorization_group" json:"authorization_group"`
+	WebSearch          *WebSearchWorkflowConfig `yaml:"web_search,omitempty" json:"web_search,omitempty"`
+}
+
+// WebSearchWorkflowConfig defines the provider adapter and hard execution
+// bounds for a web-search-answer workflow. APIKeyEnv names a runtime secret;
+// the credential value is never stored in the config contract.
+type WebSearchWorkflowConfig struct {
+	Provider              string `yaml:"provider" json:"provider"`
+	Endpoint              string `yaml:"endpoint" json:"endpoint"`
+	APIKeyEnv             string `yaml:"api_key_env,omitempty" json:"api_key_env,omitempty"`
+	APIKeyHeader          string `yaml:"api_key_header,omitempty" json:"api_key_header,omitempty"`
+	TimeoutSeconds        int    `yaml:"timeout_seconds" json:"timeout_seconds"`
+	MaxResults            int    `yaml:"max_results" json:"max_results"`
+	MaxQueryCharacters    int    `yaml:"max_query_characters" json:"max_query_characters"`
+	MaxResponseBytes      int64  `yaml:"max_response_bytes" json:"max_response_bytes"`
+	MaxEvidenceCharacters int    `yaml:"max_evidence_characters" json:"max_evidence_characters"`
+}
+
+// RequestBudget is a pre-execution cost ceiling evaluated after hard model
+// capability/context checks and before any candidate-ranking algorithm.
+type RequestBudget struct {
+	Currency              string  `yaml:"currency" json:"currency"`
+	MaxEstimatedCost      float64 `yaml:"max_estimated_cost" json:"max_estimated_cost"`
+	OutputTokenBound      int     `yaml:"output_token_bound" json:"output_token_bound"`
+	ReasoningTokenBound   int     `yaml:"reasoning_token_bound,omitempty" json:"reasoning_token_bound,omitempty"`
+	RequirePricing        bool    `yaml:"require_pricing,omitempty" json:"require_pricing,omitempty"`
+	RequireCurrentPricing bool    `yaml:"require_current_pricing,omitempty" json:"require_current_pricing,omitempty"`
 }
 
 // EmitDirective is a tagged-union wrapper for declarative directives emitted

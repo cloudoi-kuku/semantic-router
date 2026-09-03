@@ -30,6 +30,7 @@ func modelPricingRates(pricing config.ModelPricing) modelpricing.Rates {
 		CachedInputPer1M: pricing.CachedInputPer1M,
 		CacheWritePer1M:  pricing.CacheWritePer1M,
 		CompletionPer1M:  pricing.CompletionPer1M,
+		ReasoningPer1M:   pricing.ReasoningPer1M,
 	}
 }
 

@@ -180,6 +180,9 @@ type rawRouteItem struct {
 	Priority     *int                 `parser:"  'PRIORITY' @Int"`
 	Tier         *int                 `parser:"| 'TIER' @Int"`
 	When         *BoolExprTop         `parser:"| 'WHEN' @@"`
+	Requires     *rawCapabilityList   `parser:"| 'REQUIRES' @@"`
+	Budget       *rawBudgetDecl       `parser:"| 'BUDGET' @@"`
+	Workflow     *rawWorkflowDecl     `parser:"| 'WORKFLOW' @@"`
 	Model        *rawModelList        `parser:"| 'MODEL' @@"`
 	Algorithm    *rawAlgoSpec         `parser:"| 'ALGORITHM' @@"`
 	Plugin       *rawPluginRef        `parser:"| 'PLUGIN' @@"`
@@ -187,6 +190,19 @@ type rawRouteItem struct {
 	Action       *rawActionDecl       `parser:"| 'ACTION' @@"`
 	CandidateFor *rawCandidateForDecl `parser:"| @@"`
 	Emit         *rawEmitDecl         `parser:"| @@"`
+}
+
+type rawBudgetDecl struct {
+	Fields []*FieldEntry `parser:"'{' @@* '}'"`
+}
+
+type rawWorkflowDecl struct {
+	Fields []*FieldEntry `parser:"'{' @@* '}'"`
+}
+
+// rawCapabilityList is a bounded list of provider-neutral catalogue IDs.
+type rawCapabilityList struct {
+	Values []string `parser:"'[' @(Ident | String) ( ',' @(Ident | String) )* ','? ']'"`
 }
 
 // rawActionDecl: ACTION <type> <destination>, e.g. ACTION route "safe-model".
@@ -434,19 +450,45 @@ type SignalDecl struct {
 
 // RouteDecl represents a ROUTE declaration.
 type RouteDecl struct {
-	Name                string
-	Description         string
-	OnUnknown           string
-	Action              *ActionDecl
-	Priority            int
-	Tier                int
-	When                BoolExpr
-	Models              []*ModelRef
-	Algorithm           *AlgoSpec
-	Plugins             []*PluginRef
-	CandidateIterations []*CandidateIterationDecl
-	Emits               []*EmitDecl
-	Pos                 Position
+	Name                 string
+	Description          string
+	OnUnknown            string
+	Action               *ActionDecl
+	Priority             int
+	Tier                 int
+	When                 BoolExpr
+	RequiredCapabilities []string
+	RequestBudget        *RequestBudgetDecl
+	Workflow             *WorkflowDecl
+	Models               []*ModelRef
+	Algorithm            *AlgoSpec
+	Plugins              []*PluginRef
+	CandidateIterations  []*CandidateIterationDecl
+	Emits                []*EmitDecl
+	Pos                  Position
+}
+
+type RequestBudgetDecl struct {
+	Currency              string
+	MaxEstimatedCost      float64
+	OutputTokenBound      int
+	ReasoningTokenBound   int
+	RequirePricing        bool
+	RequireCurrentPricing bool
+}
+
+type WorkflowDecl struct {
+	Type                  string
+	AuthorizationGroup    string
+	Provider              string
+	Endpoint              string
+	APIKeyEnv             string
+	APIKeyHeader          string
+	TimeoutSeconds        int
+	MaxResults            int
+	MaxQueryCharacters    int
+	MaxResponseBytes      int
+	MaxEvidenceCharacters int
 }
 
 // ActionDecl is the resolved AST node for a route ACTION statement.

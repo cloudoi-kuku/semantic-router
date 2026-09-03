@@ -102,11 +102,17 @@ export interface ReasoningFamily {
 }
 
 export interface ModelPricing {
+  version?: string
+  source?: string
+  unit?: 'per_1m_tokens'
+  effective_at?: string
+  expires_at?: string
   currency?: string
   prompt_per_1m?: number
   cached_input_per_1m?: number
   cache_write_per_1m?: number
   completion_per_1m?: number
+  reasoning_per_1m?: number
 }
 
 export interface ProviderReliability {
@@ -238,12 +244,42 @@ export interface DecisionConfig {
   priority: number
   rules: DecisionRuleSet
   modelRefs: DecisionModelRef[]
+  required_capabilities?: string[]
+  request_budget?: RequestBudget
+  workflow?: WorkflowConfig
   plugins?: DecisionPluginConfig[]
   algorithm?: Record<string, unknown>
   candidateIterations?: unknown
   tier?: number
   annotations?: Record<string, unknown>
   output_contract?: string
+}
+
+export interface RequestBudget {
+  currency: string
+  max_estimated_cost: number
+  output_token_bound: number
+  reasoning_token_bound?: number
+  require_pricing?: boolean
+  require_current_pricing?: boolean
+}
+
+export interface WorkflowConfig {
+  type: 'web_search_answer'
+  authorization_group: string
+  web_search: WebSearchWorkflowConfig
+}
+
+export interface WebSearchWorkflowConfig {
+  provider: 'searxng'
+  endpoint: string
+  api_key_env?: string
+  api_key_header?: string
+  timeout_seconds: number
+  max_results: number
+  max_query_characters: number
+  max_response_bytes: number
+  max_evidence_characters: number
 }
 
 export const ROUTING_STRATEGIES = ['priority', 'confidence'] as const
@@ -1303,6 +1339,24 @@ export interface DecisionFormState {
   operator: 'AND' | 'OR' | 'NOT'
   on_unknown?: '' | 'no_match' | 'match' | 'fail_request'
   conditions: DecisionCondition[]
+  required_capabilities: string[]
+  request_budget_enabled: boolean
+  request_budget_currency: string
+  request_budget_max_cost: number
+  request_budget_output_tokens: number
+  request_budget_reasoning_tokens: number
+  request_budget_require_pricing: boolean
+  request_budget_require_current: boolean
+  workflow_enabled: boolean
+  workflow_authorization_group: string
+  workflow_endpoint: string
+  workflow_api_key_env: string
+  workflow_api_key_header: string
+  workflow_timeout_seconds: number
+  workflow_max_results: number
+  workflow_max_query_characters: number
+  workflow_max_response_bytes: number
+  workflow_max_evidence_characters: number
   modelRefs: DecisionModelRef[]
   plugins: { type: string; configuration: string | DecisionPluginConfiguration }[]
 }

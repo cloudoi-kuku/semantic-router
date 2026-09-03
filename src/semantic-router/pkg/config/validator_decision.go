@@ -29,31 +29,30 @@ func validateDecisionContracts(cfg *RouterConfig) error {
 
 func validateDecisionModelContracts(cfg *RouterConfig) error {
 	for _, decision := range cfg.AllRoutingDecisions() {
-		if err := validateDecisionRuleNode(cfg, decision.Name, &decision.Rules, true); err != nil {
+		if err := validateOneDecisionModelContract(cfg, decision); err != nil {
 			return err
 		}
-		if err := validateDecisionAnnotations(decision); err != nil {
-			return err
-		}
-		if err := validateDecisionModelRefs(cfg, decision); err != nil {
-			return err
-		}
-		if err := validateDecisionAction(cfg, decision); err != nil {
-			return err
-		}
-		if err := validateDecisionAlgorithmConfig(decision.Name, decision.ModelRefs, decision.Algorithm); err != nil {
-			return err
-		}
-		if err := validateDecisionPromptModel(cfg, decision); err != nil {
-			return err
-		}
-		if err := validateDecisionWorkflowModelRefs(decision); err != nil {
-			return err
-		}
-		if err := validateDecisionCandidateIterations(decision); err != nil {
-			return err
-		}
-		if err := validateDecisionOutputContractSpec(decision); err != nil {
+	}
+	return nil
+}
+
+func validateOneDecisionModelContract(cfg *RouterConfig, decision Decision) error {
+	validators := []func() error{
+		func() error { return validateDecisionRuleNode(cfg, decision.Name, &decision.Rules, true) },
+		func() error { return validateDecisionAnnotations(decision) },
+		func() error { return validateDecisionModelRefs(cfg, decision) },
+		func() error { return validateDecisionCapabilityContracts(cfg, decision) },
+		func() error { return validateDecisionAction(cfg, decision) },
+		func() error {
+			return validateDecisionAlgorithmConfig(decision.Name, decision.ModelRefs, decision.Algorithm)
+		},
+		func() error { return validateDecisionPromptModel(cfg, decision) },
+		func() error { return validateDecisionWorkflowModelRefs(decision) },
+		func() error { return validateDecisionCandidateIterations(decision) },
+		func() error { return validateDecisionOutputContractSpec(decision) },
+	}
+	for _, validate := range validators {
+		if err := validate(); err != nil {
 			return err
 		}
 	}

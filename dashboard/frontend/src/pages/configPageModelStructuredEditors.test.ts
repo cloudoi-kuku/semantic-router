@@ -64,7 +64,10 @@ describe('model structured editors', () => {
           readOnly: true,
         }),
         createElement(ModelPricingEditor, {
-          value: { currency: 'USD', prompt_per_1m: 0.5, completion_per_1m: 1.5 },
+          value: {
+            version: '2026-09-03', source: 'official', unit: 'per_1m_tokens',
+            currency: 'USD', prompt_per_1m: 0.5, completion_per_1m: 1.5,
+          },
           readOnly: true,
         }),
       ),
@@ -74,6 +77,7 @@ describe('model structured editors', () => {
     expect(markup).toContain('code-expert')
     expect(markup).toContain('openai')
     expect(markup).toContain('Prompt / 1M tokens')
+    expect(markup).toContain('Price version')
     expect(markup).not.toContain('JSON')
   })
 

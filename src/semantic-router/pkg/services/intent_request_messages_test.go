@@ -254,6 +254,7 @@ func TestIntentRequestResolveSignalInput_RequestContextEstimateMatchesDataPlaneC
 	assert.Equal(t, "ok", input.evaluationText,
 		"semantic signals must still receive only the current user text")
 	assert.Equal(t, want.TokenFloor, input.requestFacts.ContextTokenFloor)
+	assert.Equal(t, want.TokenFloor-want.OutputTokenReserve, input.inputTokenFloor)
 	assert.Equal(t, want.TextBytes, input.requestFacts.ContextTextBytes)
 	assert.Equal(t, want.EquivalentBytes, input.requestFacts.ContextEquivalentBytes)
 	assert.Equal(t, want.HasNonText, input.requestFacts.ContextHasNonText)

@@ -1,6 +1,7 @@
 package services
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -71,7 +72,13 @@ func (s *ClassificationService) ClassifyIntentForEval(req IntentRequest) (*EvalR
 		resp.DecisionError = decisionErr.Error()
 		return resp, decisionErr
 	}
-	s.populateEvalModelSelection(resp, input, decisionResult)
+	s.populateEvalModelSelection(
+		resp,
+		input,
+		decisionResult,
+		intentTokenBound(req.MaxCompletionTokens, req.MaxTokens),
+		intentTokenBound(req.ReasoningBudgetTokens),
+	)
 	return resp, nil
 }
 
@@ -79,6 +86,8 @@ func (s *ClassificationService) populateEvalModelSelection(
 	response *EvalResponse,
 	input intentSignalInput,
 	decisionResult *decision.DecisionResult,
+	outputTokenBound int,
+	reasoningTokenBound int,
 ) {
 	if response == nil || decisionResult == nil || decisionResult.Decision == nil {
 		return
@@ -90,16 +99,63 @@ func (s *ClassificationService) populateEvalModelSelection(
 		return
 	}
 	selection := selector.SelectModelForEval(EvalModelSelectionInput{
-		Recipe:            response.Recipe,
-		Decision:          decisionResult.Decision,
-		Query:             input.currentUserText,
-		Category:          evalDecisionCategory(decisionResult.MatchedRules),
-		ContextTokenCount: input.requestFacts.ContextTokenFloor,
+		Recipe:              response.Recipe,
+		Decision:            decisionResult.Decision,
+		Query:               input.currentUserText,
+		Category:            evalDecisionCategory(decisionResult.MatchedRules),
+		ContextTokenCount:   input.requestFacts.ContextTokenFloor,
+		InputTokenCount:     input.inputTokenFloor,
+		OutputTokenBound:    outputTokenBound,
+		ReasoningTokenBound: reasoningTokenBound,
 	})
 	response.SelectedModel = selection.SelectedModel
 	response.SelectionStatus = selection.Status
 	response.SelectionMethod = selection.Method
 	response.SelectionReason = selection.Reason
+	response.Eligibility = selection.Eligibility
+	response.Cost = selection.Cost
+	response.Workflow = workflowEvaluation(
+		decisionResult.Decision.Workflow,
+		response.SelectedModel,
+	)
+}
+
+func workflowEvaluation(workflow *config.WorkflowConfig, synthesisModel string) *WorkflowEvaluation {
+	if workflow == nil || workflow.WebSearch == nil {
+		return nil
+	}
+	return &WorkflowEvaluation{
+		ContractVersion: config.WorkflowContractVersion,
+		Type:            workflow.Type,
+		Status:          "planned",
+		Authorization: WorkflowAuthorizationEvidence{
+			RequiredGroup: workflow.AuthorizationGroup,
+			Status:        "not_evaluated",
+		},
+		Tool: WorkflowToolPlan{
+			Type:                  "web_search",
+			Provider:              workflow.WebSearch.Provider,
+			MaxResults:            workflow.WebSearch.MaxResults,
+			TimeoutSeconds:        workflow.WebSearch.TimeoutSeconds,
+			MaxResponseBytes:      workflow.WebSearch.MaxResponseBytes,
+			MaxEvidenceCharacters: workflow.WebSearch.MaxEvidenceCharacters,
+		},
+		SynthesisModel: synthesisModel,
+		ExecutesTools:  false,
+	}
+}
+
+func intentTokenBound(values ...json.RawMessage) int {
+	for _, raw := range values {
+		if len(raw) == 0 {
+			continue
+		}
+		var value int
+		if json.Unmarshal(raw, &value) == nil && value > 0 {
+			return value
+		}
+	}
+	return 0
 }
 
 func evalDecisionCategory(matchedRules []string) string {

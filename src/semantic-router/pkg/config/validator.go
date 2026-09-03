@@ -20,6 +20,8 @@ var (
 
 	globalConfigContractValidators = []configContractValidator{
 		validateModelPricingContracts,
+		validateRequestBudgetContracts,
+		validateWorkflowContracts,
 		validateReasoningFamilyContracts,
 		validateGlobalSemanticCacheContracts,
 		validateGlobalMemoryContracts,

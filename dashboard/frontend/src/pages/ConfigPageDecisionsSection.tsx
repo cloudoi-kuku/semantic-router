@@ -44,6 +44,22 @@ interface ConfigPageDecisionsSectionProps {
 
 type DecisionRow = DecisionConfig
 
+const REQUIRED_MODEL_CAPABILITIES = [
+  'chat',
+  'text',
+  'reasoning',
+  'tool_calling',
+  'parallel_tool_calling',
+  'structured_output',
+  'json_schema',
+  'vision',
+  'audio',
+  'video',
+  'file',
+  'embeddings',
+  'image_generation',
+]
+
 export default function ConfigPageDecisionsSection({
   config,
   isPythonCLI,
@@ -59,13 +75,8 @@ export default function ConfigPageDecisionsSection({
   const [decisionPendingDelete, setDecisionPendingDelete] = useState<DecisionConfig | null>(null)
   const [decisionDeletePending, setDecisionDeletePending] = useState(false)
   const [decisionDeleteError, setDecisionDeleteError] = useState<string | null>(null)
-  const {
-    applyScopedConfig,
-    routingScopes,
-    scopedConfig,
-    selectedScopeId,
-    setSelectedScopeId,
-  } = useRoutingScopeManager(config)
+  const { applyScopedConfig, routingScopes, scopedConfig, selectedScopeId, setSelectedScopeId } =
+    useRoutingScopeManager(config)
   useEffect(() => {
     setDecisionPendingDelete(null)
     setDecisionDeleteError(null)
@@ -303,6 +314,24 @@ export default function ConfigPageDecisionsSection({
       operator: 'AND',
       on_unknown: '',
       conditions: [{ type: 'keyword', name: '' }],
+      required_capabilities: [],
+      request_budget_enabled: false,
+      request_budget_currency: 'USD',
+      request_budget_max_cost: 0.01,
+      request_budget_output_tokens: 1024,
+      request_budget_reasoning_tokens: 0,
+      request_budget_require_pricing: true,
+      request_budget_require_current: true,
+      workflow_enabled: false,
+      workflow_authorization_group: 'web-search-users',
+      workflow_endpoint: '',
+      workflow_api_key_env: '',
+      workflow_api_key_header: '',
+      workflow_timeout_seconds: 5,
+      workflow_max_results: 5,
+      workflow_max_query_characters: 500,
+      workflow_max_response_bytes: 262144,
+      workflow_max_evidence_characters: 8000,
       modelRefs: [
         {
           model: '',
@@ -324,6 +353,28 @@ export default function ConfigPageDecisionsSection({
             operator: decision.rules?.operator || 'AND',
             on_unknown: decision.rules?.on_unknown || '',
             conditions: cloneDecisionConditions(decision.rules?.conditions),
+            required_capabilities: [...(decision.required_capabilities || [])],
+            request_budget_enabled: Boolean(decision.request_budget),
+            request_budget_currency: decision.request_budget?.currency || 'USD',
+            request_budget_max_cost: decision.request_budget?.max_estimated_cost || 0.01,
+            request_budget_output_tokens: decision.request_budget?.output_token_bound || 1024,
+            request_budget_reasoning_tokens: decision.request_budget?.reasoning_token_bound || 0,
+            request_budget_require_pricing: decision.request_budget?.require_pricing ?? true,
+            request_budget_require_current:
+              decision.request_budget?.require_current_pricing ?? true,
+            workflow_enabled: Boolean(decision.workflow),
+            workflow_authorization_group:
+              decision.workflow?.authorization_group || 'web-search-users',
+            workflow_endpoint: decision.workflow?.web_search.endpoint || '',
+            workflow_api_key_env: decision.workflow?.web_search.api_key_env || '',
+            workflow_api_key_header: decision.workflow?.web_search.api_key_header || '',
+            workflow_timeout_seconds: decision.workflow?.web_search.timeout_seconds || 5,
+            workflow_max_results: decision.workflow?.web_search.max_results || 5,
+            workflow_max_query_characters:
+              decision.workflow?.web_search.max_query_characters || 500,
+            workflow_max_response_bytes: decision.workflow?.web_search.max_response_bytes || 262144,
+            workflow_max_evidence_characters:
+              decision.workflow?.web_search.max_evidence_characters || 8000,
             modelRefs: (decision.modelRefs || []).map((ref) => ({
               model: ref.model,
               use_reasoning: !!ref.use_reasoning,
@@ -631,7 +682,8 @@ export default function ConfigPageDecisionsSection({
         label: 'On Unknown',
         type: 'select',
         options: ['', 'no_match', 'match', 'fail_request'],
-        description: 'Resolve classifier backend failures after the complete rule tree is evaluated.',
+        description:
+          'Resolve classifier backend failures after the complete rule tree is evaluated.',
       },
       {
         name: 'conditions',
@@ -643,6 +695,138 @@ export default function ConfigPageDecisionsSection({
             Array.isArray(value) ? (value as DecisionFormState['conditions']) : [],
             (nextValue) => onChange(nextValue),
           ),
+      },
+      {
+        name: 'required_capabilities',
+        label: 'Required model capabilities',
+        type: 'multiselect',
+        options: REQUIRED_MODEL_CAPABILITIES,
+        description: 'Hard eligibility requirements applied before model ranking.',
+      },
+      {
+        name: 'request_budget_enabled',
+        label: 'Enforce request budget',
+        type: 'boolean',
+        description:
+          'Filter candidates whose conservative pre-execution estimate exceeds a hard ceiling.',
+      },
+      {
+        name: 'request_budget_currency',
+        label: 'Budget currency',
+        type: 'text',
+        placeholder: 'USD',
+        shouldHide: (data) => !data.request_budget_enabled,
+      },
+      {
+        name: 'request_budget_max_cost',
+        label: 'Maximum estimated cost',
+        type: 'number',
+        min: 0,
+        step: 0.000001,
+        shouldHide: (data) => !data.request_budget_enabled,
+      },
+      {
+        name: 'request_budget_output_tokens',
+        label: 'Output token bound',
+        type: 'number',
+        min: 1,
+        step: 1,
+        shouldHide: (data) => !data.request_budget_enabled,
+      },
+      {
+        name: 'request_budget_reasoning_tokens',
+        label: 'Reasoning token bound',
+        type: 'number',
+        min: 0,
+        step: 1,
+        shouldHide: (data) => !data.request_budget_enabled,
+      },
+      {
+        name: 'request_budget_require_pricing',
+        label: 'Require configured pricing',
+        type: 'boolean',
+        shouldHide: (data) => !data.request_budget_enabled,
+      },
+      {
+        name: 'request_budget_require_current',
+        label: 'Require current pricing',
+        type: 'boolean',
+        shouldHide: (data) => !data.request_budget_enabled,
+      },
+      {
+        name: 'workflow_enabled',
+        label: 'Enable web-search workflow',
+        type: 'boolean',
+        description:
+          'Require trusted group authorization, retrieve bounded SearXNG evidence, then synthesize with the selected model.',
+      },
+      {
+        name: 'workflow_authorization_group',
+        label: 'Authorized group',
+        type: 'text',
+        placeholder: 'web-search-users',
+        shouldHide: (data) => !data.workflow_enabled,
+      },
+      {
+        name: 'workflow_endpoint',
+        label: 'SearXNG endpoint',
+        type: 'text',
+        placeholder: 'https://search.example.com/search',
+        shouldHide: (data) => !data.workflow_enabled,
+      },
+      {
+        name: 'workflow_api_key_env',
+        label: 'Search API key environment variable',
+        type: 'text',
+        placeholder: 'WEB_SEARCH_API_KEY',
+        shouldHide: (data) => !data.workflow_enabled,
+      },
+      {
+        name: 'workflow_api_key_header',
+        label: 'Search API key header',
+        type: 'text',
+        placeholder: 'X-Search-Token',
+        shouldHide: (data) => !data.workflow_enabled,
+      },
+      {
+        name: 'workflow_timeout_seconds',
+        label: 'Search timeout seconds',
+        type: 'number',
+        min: 1,
+        step: 1,
+        shouldHide: (data) => !data.workflow_enabled,
+      },
+      {
+        name: 'workflow_max_results',
+        label: 'Maximum search results',
+        type: 'number',
+        min: 1,
+        step: 1,
+        shouldHide: (data) => !data.workflow_enabled,
+      },
+      {
+        name: 'workflow_max_query_characters',
+        label: 'Maximum query characters',
+        type: 'number',
+        min: 1,
+        step: 1,
+        shouldHide: (data) => !data.workflow_enabled,
+      },
+      {
+        name: 'workflow_max_response_bytes',
+        label: 'Maximum search response bytes',
+        type: 'number',
+        min: 1024,
+        step: 1,
+        shouldHide: (data) => !data.workflow_enabled,
+      },
+      {
+        name: 'workflow_max_evidence_characters',
+        label: 'Maximum injected evidence characters',
+        type: 'number',
+        min: 128,
+        step: 1,
+        shouldHide: (data) => !data.workflow_enabled,
       },
       {
         name: 'modelRefs',
@@ -771,6 +955,42 @@ export default function ConfigPageDecisionsSection({
           conditions,
           ...(formData.on_unknown ? { on_unknown: formData.on_unknown } : {}),
         }),
+        required_capabilities: formData.required_capabilities || [],
+        ...(formData.request_budget_enabled
+          ? {
+              request_budget: {
+                currency: formData.request_budget_currency.trim().toUpperCase(),
+                max_estimated_cost: Number(formData.request_budget_max_cost),
+                output_token_bound: Number(formData.request_budget_output_tokens),
+                reasoning_token_bound: Number(formData.request_budget_reasoning_tokens),
+                require_pricing: formData.request_budget_require_pricing,
+                require_current_pricing: formData.request_budget_require_current,
+              },
+            }
+          : { request_budget: undefined }),
+        ...(formData.workflow_enabled
+          ? {
+              workflow: {
+                type: 'web_search_answer' as const,
+                authorization_group: formData.workflow_authorization_group.trim(),
+                web_search: {
+                  provider: 'searxng' as const,
+                  endpoint: formData.workflow_endpoint.trim(),
+                  ...(formData.workflow_api_key_env.trim()
+                    ? { api_key_env: formData.workflow_api_key_env.trim() }
+                    : {}),
+                  ...(formData.workflow_api_key_header.trim()
+                    ? { api_key_header: formData.workflow_api_key_header.trim() }
+                    : {}),
+                  timeout_seconds: Number(formData.workflow_timeout_seconds),
+                  max_results: Number(formData.workflow_max_results),
+                  max_query_characters: Number(formData.workflow_max_query_characters),
+                  max_response_bytes: Number(formData.workflow_max_response_bytes),
+                  max_evidence_characters: Number(formData.workflow_max_evidence_characters),
+                },
+              },
+            }
+          : { workflow: undefined }),
         modelRefs,
         plugins,
       })
