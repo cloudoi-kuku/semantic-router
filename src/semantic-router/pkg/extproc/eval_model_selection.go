@@ -49,6 +49,7 @@ func (r *OpenAIRouter) SelectModelForEval(
 		input.ReasoningTokenBound,
 		time.Now().UTC(),
 	)
+	budgetResult = r.boundFallbackChain(budgetResult, decision)
 	cost = budgetResult.evaluation
 	eligibleModelRefs = budgetResult.eligible
 	eligibility.EligibleModels = modelRefNames(eligibleModelRefs)

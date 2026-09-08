@@ -68,6 +68,12 @@ deployments and may rely on model or service definitions from a base config.
 - `config/fragments/plugin/`: route-local request or response processing such
   as caching, memory, RAG, tool policy, and safety handling.
 
+The looper catalogue includes `fallback`, an ordered cross-provider
+availability chain with a mandatory attempt ceiling. Provider `reliability`
+may additionally declare `circuit_breaker_failures` and
+`circuit_breaker_open_time`; request-budget estimates reserve every configured
+Envoy retry and every eligible fallback attempt.
+
 The corresponding website sections are
 [`tutorials/signal/`](../website/docs/tutorials/signal/),
 [`tutorials/decision/`](../website/docs/tutorials/decision/),
@@ -110,9 +116,10 @@ runtime dependency; they do not define routing behavior by themselves.
   bounds and filters missing, stale, wrong-currency, or over-budget models
   before ranking.
 - `routing.decisions[].workflow` selects a provider-independent execution path
-  before synthesis. The initial `web_search_answer` contract requires a trusted
-  authorization group and bounds the SearXNG query, timeout, result count,
-  response bytes, and provenance-tagged evidence injected into the model.
+  before synthesis. `web_search_answer` bounds SearXNG evidence;
+  `mcp_tool_call` authorizes one allowlisted HTTP MCP tool, requires discovery
+  metadata to declare it read-only, and bounds response bytes, time, and
+  provenance-tagged text injected into the model.
 - Protocol controls such as `tool_choice` enter routing as conversation facts;
   projections combine those facts with text-derived intent before decisions
   apply policy.

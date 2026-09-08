@@ -22,13 +22,21 @@ The development profile under `config/niffy/` currently provides:
 - an economical Mistral fallback for routine prompts;
 - an xAI route for explicit freshness, search, and tool intent;
 - an OpenAI route for deliberate reasoning;
-- deterministic keyword routing with a 15-probe calibration suite;
-- strict provider response normalization and live three-provider forwarding.
+- deterministic keyword overrides plus calibrated local embedding and
+  prototype-complexity signals;
+- strict provider response normalization and live three-provider forwarding;
+- provider-neutral capability eligibility and conservative request-cost
+  budgets before ranking;
+- an inspectable, non-executing routing-decision contract; and
+- authorized, bounded SearXNG and read-only MCP workflow contracts; and
+- content-free execution evidence for actual usage, cost, savings, latency,
+  retries, fallback, and measured-or-explicitly-unmeasured quality.
 
-This proves provider-independent ingress and basic model selection. It does
-not yet execute search or MCP tools, estimate request cost, enforce tenant
-budgets, learn from outcomes, or expose a stable product-facing decision
-contract.
+This proves provider-independent ingress, capability and cost gates, dry-run
+inspection, bounded workflow execution, availability fallback, locally
+classified semantic routing, and runtime accounting. It does not yet enforce
+persisted tenant budgets, learn online from outcomes, automate quality-based
+escalation, or expose a stable product-facing API.
 
 ## Product Boundary
 
@@ -171,6 +179,17 @@ must be absolute HTTP(S) URLs; normalized evidence is delimited and explicitly
 marked untrusted before it is injected as a tool result for synthesis. Dry-run
 reports the workflow but performs neither authorization nor tool execution.
 
+The same contract now supports `mcp_tool_call` for a single explicitly
+allowlisted tool on an operator-configured HTTP MCP server. Authorization is
+checked before credentials are resolved or capability discovery begins. The
+runtime discovers the configured tool, requires an explicit
+`readOnlyHint=true` and no destructive hint, validates its required top-level
+arguments, and performs one call within response-byte, timeout, and injected
+character bounds. Only text results are accepted; they are escaped,
+provenance-tagged with server and tool names, marked untrusted, and injected as
+a tool result. Stdio servers and prompt-selected tool names are intentionally
+outside this first boundary.
+
 ## Cost and Utility Model
 
 For every candidate, Niffy should estimate:
@@ -245,6 +264,16 @@ providers, and a terminal disposition. Niffy must not routinely call an
 expensive model after every economical response, because that destroys the
 economic objective.
 
+NIFFY-07 implements availability fallback as an ordered Looper algorithm. Its
+failure classes and model-attempt count are explicit; non-retryable failures
+stop the chain. Runtime model circuits use configured consecutive-failure and
+open-duration bounds, and health-open models are excluded before selection.
+Pre-execution estimates multiply each model by its same-model Envoy retry
+allowance and admit only the prefix of a fallback chain that fits the decision
+budget. Dry-run returns `vllm-sr/resilience-plan/v1alpha1` and never calls or
+probes a provider. Automated response-quality escalation remains separate from
+availability fallback and requires a configured quality gate.
+
 ## Privacy and Security
 
 - Provider keys remain environment- or secret-store-backed and are redacted
@@ -270,6 +299,23 @@ premium-model avoidance, fallback rate, escalation rate, decision latency,
 provider latency, quality-gate failure, and savings against the configured
 baseline. Cardinality must be bounded; tenant IDs and request content do not
 belong in metric labels.
+
+NIFFY-08 records `vllm-sr/execution-evidence/v1alpha1` as a content-free
+Router Replay outcome. It correlates provider-reported token usage with pinned
+pricing, the configured premium baseline, observed end-to-end latency, Envoy
+same-model attempt counts, Looper model attempts, and fallback use. The replay
+aggregate exposes totals for these fields, while Prometheus uses only bounded
+algorithm, retry-kind, quality-state, and currency labels. Request and response
+capture remain disabled in the Niffy profile. Quality is recorded as
+`not_measured` unless an enabled quality guard actually evaluates it.
+
+NIFFY-09 keeps keyword matches as deterministic policy overrides and adds two
+provider-independent local signals: `live_information_task` uses embedding
+similarity for freshness/search paraphrases, and `reasoning_demand` uses a
+hard-versus-easy prototype margin. Both are evaluated without a provider LLM
+call. Their thresholds, prototype text, contract version, and tagged probes are
+versioned inputs to calibration; tool intent retains higher priority than
+reasoning when both match.
 
 ## Evaluation Strategy
 
@@ -312,14 +358,15 @@ classifier, and evaluation version so results remain reproducible.
 2. **Capability catalogue:** eligibility filtering independent of provider.
 3. **Cost estimation (implemented):** versioned prices, token estimates,
    request budgets, and alternative-cost comparison.
-4. **Workflow routing (web search implemented):** authorized bounded SearXNG
-   evidence is available; generic MCP execution is next.
+4. **Workflow routing (implemented):** authorized bounded SearXNG evidence and
+   allowlisted read-only HTTP MCP execution are available.
 5. **Resilience:** health-aware fallback, bounded escalation, and circuit
    breaking.
-6. **Evidence:** usage accounting, savings telemetry, quality outcomes, and
-   replayable evaluation.
-7. **Adaptive routing:** calibrated local classifiers and learning from
-   privacy-safe outcome data.
+6. **Evidence (implemented):** usage accounting, savings telemetry, explicit
+   quality outcomes, retries, latency, and replayable execution evidence.
+7. **Adaptive routing (local classifiers implemented):** calibrated local
+   classifiers retain deterministic overrides; online learning from
+   privacy-safe outcomes remains future work.
 8. **Product contract:** stable SDK-facing API, tenant policy, compatibility,
    and deployment hardening.
 

@@ -52,24 +52,26 @@ workflow decisions.
   freshness metadata, conservative input/output/reasoning cost estimates,
   hard per-request decision budgets, and inspectable alternative-cost
   comparison before ranking.
-- [ ] `NIFFY-05` Define workflow contracts and implement an authorized
-  web-search workflow.
-- [ ] `NIFFY-06` Add generic MCP discovery, authorization, execution, and
+- [x] `NIFFY-05` Define `vllm-sr/workflow/v1alpha1` and implement one
+  authorized, bounded SearXNG web-search workflow with untrusted,
+  provenance-tagged evidence injection and a non-executing dry-run preview.
+- [x] `NIFFY-06` Add generic MCP discovery, authorization, execution, and
   result-injection boundaries.
-- [ ] `NIFFY-07` Add health-aware fallback, bounded escalation, and provider
+- [x] `NIFFY-07` Add health-aware fallback, bounded escalation, and provider
   circuit breaking.
-- [ ] `NIFFY-08` Record privacy-safe usage, actual cost, latency, quality,
-  retries, and savings evidence.
-- [ ] `NIFFY-09` Introduce calibrated local task/capability classifiers while
-  retaining deterministic policy overrides.
+- [x] `NIFFY-08` Record `vllm-sr/execution-evidence/v1alpha1` privacy-safe
+  usage, actual cost, latency, explicit quality status, retries, fallback, and
+  savings evidence in Router Replay and bounded-cardinality metrics.
+- [x] `NIFFY-09` Introduce calibrated local embedding and prototype-complexity
+  classifiers while retaining deterministic keyword policy overrides and tool
+  priority.
 - [ ] `NIFFY-10` Stabilize the product-facing API and complete tenant policy,
   SDK, deployment, and compatibility hardening.
 
 ## Next Action
 
-Complete `NIFFY-05`: define a provider-independent workflow contract and ship
-one authorized web-search workflow that returns bounded, provenance-tagged
-evidence to an eligible synthesis model.
+Complete `NIFFY-10`: stabilize the product-facing API and finish tenant policy,
+SDK, deployment, persistence, and compatibility hardening.
 
 ## Operating Rules
 

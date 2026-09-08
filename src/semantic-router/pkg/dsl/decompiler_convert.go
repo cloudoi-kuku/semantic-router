@@ -400,18 +400,25 @@ func (d *decompiler) decisionToRoute(dec *config.Decision) *RouteDecl {
 }
 
 func workflowDeclFromConfig(workflow *config.WorkflowConfig) *WorkflowDecl {
-	if workflow == nil || workflow.WebSearch == nil {
+	if workflow == nil {
 		return nil
 	}
-	search := workflow.WebSearch
-	return &WorkflowDecl{
-		Type: workflow.Type, AuthorizationGroup: workflow.AuthorizationGroup,
-		Provider: search.Provider, Endpoint: search.Endpoint,
-		APIKeyEnv: search.APIKeyEnv, APIKeyHeader: search.APIKeyHeader,
-		TimeoutSeconds: search.TimeoutSeconds, MaxResults: search.MaxResults,
-		MaxQueryCharacters: search.MaxQueryCharacters, MaxResponseBytes: int(search.MaxResponseBytes),
-		MaxEvidenceCharacters: search.MaxEvidenceCharacters,
+	decl := &WorkflowDecl{Type: workflow.Type, AuthorizationGroup: workflow.AuthorizationGroup}
+	if search := workflow.WebSearch; search != nil {
+		decl.Provider, decl.Endpoint = search.Provider, search.Endpoint
+		decl.APIKeyEnv, decl.APIKeyHeader = search.APIKeyEnv, search.APIKeyHeader
+		decl.TimeoutSeconds, decl.MaxResults = search.TimeoutSeconds, search.MaxResults
+		decl.MaxQueryCharacters, decl.MaxResponseBytes = search.MaxQueryCharacters, int(search.MaxResponseBytes)
+		decl.MaxEvidenceCharacters = search.MaxEvidenceCharacters
 	}
+	if mcpWorkflow := workflow.MCP; mcpWorkflow != nil {
+		decl.ServerName, decl.Endpoint, decl.ToolName = mcpWorkflow.ServerName, mcpWorkflow.Endpoint, mcpWorkflow.ToolName
+		decl.Arguments = mcpWorkflow.Arguments
+		decl.APIKeyEnv, decl.APIKeyHeader = mcpWorkflow.APIKeyEnv, mcpWorkflow.APIKeyHeader
+		decl.TimeoutSeconds, decl.MaxResponseBytes = mcpWorkflow.TimeoutSeconds, int(mcpWorkflow.MaxResponseBytes)
+		decl.MaxResultCharacters, decl.RequireReadOnly = mcpWorkflow.MaxResultCharacters, mcpWorkflow.RequireReadOnly
+	}
+	return decl
 }
 
 func requestBudgetDeclFromConfig(budget *config.RequestBudget) *RequestBudgetDecl {

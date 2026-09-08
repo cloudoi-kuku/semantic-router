@@ -323,6 +323,7 @@ export default function ConfigPageDecisionsSection({
       request_budget_require_pricing: true,
       request_budget_require_current: true,
       workflow_enabled: false,
+      workflow_type: 'web_search_answer',
       workflow_authorization_group: 'web-search-users',
       workflow_endpoint: '',
       workflow_api_key_env: '',
@@ -332,6 +333,10 @@ export default function ConfigPageDecisionsSection({
       workflow_max_query_characters: 500,
       workflow_max_response_bytes: 262144,
       workflow_max_evidence_characters: 8000,
+      workflow_mcp_server_name: '',
+      workflow_mcp_tool_name: '',
+      workflow_mcp_arguments: '{\n  "query": "{{user_content}}"\n}',
+      workflow_max_result_characters: 8000,
       modelRefs: [
         {
           model: '',
@@ -363,18 +368,40 @@ export default function ConfigPageDecisionsSection({
             request_budget_require_current:
               decision.request_budget?.require_current_pricing ?? true,
             workflow_enabled: Boolean(decision.workflow),
+            workflow_type: decision.workflow?.type || 'web_search_answer',
             workflow_authorization_group:
               decision.workflow?.authorization_group || 'web-search-users',
-            workflow_endpoint: decision.workflow?.web_search.endpoint || '',
-            workflow_api_key_env: decision.workflow?.web_search.api_key_env || '',
-            workflow_api_key_header: decision.workflow?.web_search.api_key_header || '',
-            workflow_timeout_seconds: decision.workflow?.web_search.timeout_seconds || 5,
-            workflow_max_results: decision.workflow?.web_search.max_results || 5,
+            workflow_endpoint:
+              decision.workflow?.web_search?.endpoint || decision.workflow?.mcp?.endpoint || '',
+            workflow_api_key_env:
+              decision.workflow?.web_search?.api_key_env ||
+              decision.workflow?.mcp?.api_key_env ||
+              '',
+            workflow_api_key_header:
+              decision.workflow?.web_search?.api_key_header ||
+              decision.workflow?.mcp?.api_key_header ||
+              '',
+            workflow_timeout_seconds:
+              decision.workflow?.web_search?.timeout_seconds ||
+              decision.workflow?.mcp?.timeout_seconds ||
+              5,
+            workflow_max_results: decision.workflow?.web_search?.max_results || 5,
             workflow_max_query_characters:
-              decision.workflow?.web_search.max_query_characters || 500,
-            workflow_max_response_bytes: decision.workflow?.web_search.max_response_bytes || 262144,
+              decision.workflow?.web_search?.max_query_characters || 500,
+            workflow_max_response_bytes:
+              decision.workflow?.web_search?.max_response_bytes ||
+              decision.workflow?.mcp?.max_response_bytes ||
+              262144,
             workflow_max_evidence_characters:
-              decision.workflow?.web_search.max_evidence_characters || 8000,
+              decision.workflow?.web_search?.max_evidence_characters || 8000,
+            workflow_mcp_server_name: decision.workflow?.mcp?.server_name || '',
+            workflow_mcp_tool_name: decision.workflow?.mcp?.tool_name || '',
+            workflow_mcp_arguments: JSON.stringify(
+              decision.workflow?.mcp?.arguments || { query: '{{user_content}}' },
+              null,
+              2,
+            ),
+            workflow_max_result_characters: decision.workflow?.mcp?.max_result_characters || 8000,
             modelRefs: (decision.modelRefs || []).map((ref) => ({
               model: ref.model,
               use_reasoning: !!ref.use_reasoning,
@@ -755,10 +782,16 @@ export default function ConfigPageDecisionsSection({
       },
       {
         name: 'workflow_enabled',
-        label: 'Enable web-search workflow',
+        label: 'Enable pre-synthesis workflow',
         type: 'boolean',
-        description:
-          'Require trusted group authorization, retrieve bounded SearXNG evidence, then synthesize with the selected model.',
+        description: 'Authorize a bounded web-search or read-only MCP call before synthesis.',
+      },
+      {
+        name: 'workflow_type',
+        label: 'Workflow type',
+        type: 'select',
+        options: ['web_search_answer', 'mcp_tool_call'],
+        shouldHide: (data) => !data.workflow_enabled,
       },
       {
         name: 'workflow_authorization_group',
@@ -769,28 +802,28 @@ export default function ConfigPageDecisionsSection({
       },
       {
         name: 'workflow_endpoint',
-        label: 'SearXNG endpoint',
+        label: 'HTTP endpoint',
         type: 'text',
         placeholder: 'https://search.example.com/search',
         shouldHide: (data) => !data.workflow_enabled,
       },
       {
         name: 'workflow_api_key_env',
-        label: 'Search API key environment variable',
+        label: 'API key environment variable',
         type: 'text',
         placeholder: 'WEB_SEARCH_API_KEY',
         shouldHide: (data) => !data.workflow_enabled,
       },
       {
         name: 'workflow_api_key_header',
-        label: 'Search API key header',
+        label: 'API key header',
         type: 'text',
         placeholder: 'X-Search-Token',
         shouldHide: (data) => !data.workflow_enabled,
       },
       {
         name: 'workflow_timeout_seconds',
-        label: 'Search timeout seconds',
+        label: 'Timeout seconds',
         type: 'number',
         min: 1,
         step: 1,
@@ -802,7 +835,7 @@ export default function ConfigPageDecisionsSection({
         type: 'number',
         min: 1,
         step: 1,
-        shouldHide: (data) => !data.workflow_enabled,
+        shouldHide: (data) => !data.workflow_enabled || data.workflow_type !== 'web_search_answer',
       },
       {
         name: 'workflow_max_query_characters',
@@ -810,15 +843,41 @@ export default function ConfigPageDecisionsSection({
         type: 'number',
         min: 1,
         step: 1,
-        shouldHide: (data) => !data.workflow_enabled,
+        shouldHide: (data) => !data.workflow_enabled || data.workflow_type !== 'web_search_answer',
       },
       {
         name: 'workflow_max_response_bytes',
-        label: 'Maximum search response bytes',
+        label: 'Maximum response bytes',
         type: 'number',
         min: 1024,
         step: 1,
         shouldHide: (data) => !data.workflow_enabled,
+      },
+      {
+        name: 'workflow_mcp_server_name',
+        label: 'MCP server name',
+        type: 'text',
+        shouldHide: (data) => !data.workflow_enabled || data.workflow_type !== 'mcp_tool_call',
+      },
+      {
+        name: 'workflow_mcp_tool_name',
+        label: 'Allowlisted MCP tool',
+        type: 'text',
+        shouldHide: (data) => !data.workflow_enabled || data.workflow_type !== 'mcp_tool_call',
+      },
+      {
+        name: 'workflow_mcp_arguments',
+        label: 'MCP arguments (JSON)',
+        type: 'textarea',
+        shouldHide: (data) => !data.workflow_enabled || data.workflow_type !== 'mcp_tool_call',
+      },
+      {
+        name: 'workflow_max_result_characters',
+        label: 'Maximum injected MCP result characters',
+        type: 'number',
+        min: 128,
+        step: 1,
+        shouldHide: (data) => !data.workflow_enabled || data.workflow_type !== 'mcp_tool_call',
       },
       {
         name: 'workflow_max_evidence_characters',
@@ -826,7 +885,7 @@ export default function ConfigPageDecisionsSection({
         type: 'number',
         min: 128,
         step: 1,
-        shouldHide: (data) => !data.workflow_enabled,
+        shouldHide: (data) => !data.workflow_enabled || data.workflow_type !== 'web_search_answer',
       },
       {
         name: 'modelRefs',
@@ -946,6 +1005,19 @@ export default function ConfigPageDecisionsSection({
         return { type, configuration }
       })
 
+      let mcpArguments: Record<string, unknown> = {}
+      if (formData.workflow_enabled && formData.workflow_type === 'mcp_tool_call') {
+        try {
+          const parsed = JSON.parse(formData.workflow_mcp_arguments || '{}')
+          if (!parsed || Array.isArray(parsed) || typeof parsed !== 'object') {
+            throw new Error('not an object')
+          }
+          mcpArguments = parsed as Record<string, unknown>
+        } catch {
+          throw new Error('MCP arguments must be a valid JSON object.')
+        }
+      }
+
       const newDecision = mergeDecisionForSave(mode === 'edit' ? decision : undefined, {
         name,
         description: formData.description,
@@ -970,25 +1042,47 @@ export default function ConfigPageDecisionsSection({
           : { request_budget: undefined }),
         ...(formData.workflow_enabled
           ? {
-              workflow: {
-                type: 'web_search_answer' as const,
-                authorization_group: formData.workflow_authorization_group.trim(),
-                web_search: {
-                  provider: 'searxng' as const,
-                  endpoint: formData.workflow_endpoint.trim(),
-                  ...(formData.workflow_api_key_env.trim()
-                    ? { api_key_env: formData.workflow_api_key_env.trim() }
-                    : {}),
-                  ...(formData.workflow_api_key_header.trim()
-                    ? { api_key_header: formData.workflow_api_key_header.trim() }
-                    : {}),
-                  timeout_seconds: Number(formData.workflow_timeout_seconds),
-                  max_results: Number(formData.workflow_max_results),
-                  max_query_characters: Number(formData.workflow_max_query_characters),
-                  max_response_bytes: Number(formData.workflow_max_response_bytes),
-                  max_evidence_characters: Number(formData.workflow_max_evidence_characters),
-                },
-              },
+              workflow:
+                formData.workflow_type === 'mcp_tool_call'
+                  ? {
+                      type: 'mcp_tool_call' as const,
+                      authorization_group: formData.workflow_authorization_group.trim(),
+                      mcp: {
+                        server_name: formData.workflow_mcp_server_name.trim(),
+                        endpoint: formData.workflow_endpoint.trim(),
+                        tool_name: formData.workflow_mcp_tool_name.trim(),
+                        arguments: mcpArguments,
+                        ...(formData.workflow_api_key_env.trim()
+                          ? { api_key_env: formData.workflow_api_key_env.trim() }
+                          : {}),
+                        ...(formData.workflow_api_key_header.trim()
+                          ? { api_key_header: formData.workflow_api_key_header.trim() }
+                          : {}),
+                        timeout_seconds: Number(formData.workflow_timeout_seconds),
+                        max_response_bytes: Number(formData.workflow_max_response_bytes),
+                        max_result_characters: Number(formData.workflow_max_result_characters),
+                        require_read_only: true as const,
+                      },
+                    }
+                  : {
+                      type: 'web_search_answer' as const,
+                      authorization_group: formData.workflow_authorization_group.trim(),
+                      web_search: {
+                        provider: 'searxng' as const,
+                        endpoint: formData.workflow_endpoint.trim(),
+                        ...(formData.workflow_api_key_env.trim()
+                          ? { api_key_env: formData.workflow_api_key_env.trim() }
+                          : {}),
+                        ...(formData.workflow_api_key_header.trim()
+                          ? { api_key_header: formData.workflow_api_key_header.trim() }
+                          : {}),
+                        timeout_seconds: Number(formData.workflow_timeout_seconds),
+                        max_results: Number(formData.workflow_max_results),
+                        max_query_characters: Number(formData.workflow_max_query_characters),
+                        max_response_bytes: Number(formData.workflow_max_response_bytes),
+                        max_evidence_characters: Number(formData.workflow_max_evidence_characters),
+                      },
+                    },
             }
           : { workflow: undefined }),
         modelRefs,

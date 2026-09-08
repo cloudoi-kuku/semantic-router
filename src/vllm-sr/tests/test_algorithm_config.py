@@ -17,6 +17,7 @@ if str(PROJECT_ROOT) not in sys.path:
 from cli.algorithms import (  # noqa: E402
     AlgorithmConfig,
     AutoMixSelectionConfig,
+    FallbackAlgorithmConfig,
     FusionAlgorithmConfig,
     HybridSelectionConfig,
     MultiFactorSelectionConfig,
@@ -41,6 +42,19 @@ class TestAlgorithmConfigTypes:
         for algo_type in looper_types:
             config = AlgorithmConfig(type=algo_type)
             assert config.type == algo_type
+
+    def test_fallback_bounds_and_failure_classes(self):
+        fallback = FallbackAlgorithmConfig(
+            max_attempts=2,
+            retry_on=["timeout", "server_error"],
+        )
+        config = AlgorithmConfig(type="fallback", fallback=fallback)
+        assert config.fallback.max_attempts == 2
+
+        with pytest.raises(PydanticValidationError):
+            FallbackAlgorithmConfig(max_attempts=0)
+        with pytest.raises(PydanticValidationError):
+            FallbackAlgorithmConfig(max_attempts=1, retry_on=["any_error"])
 
     def test_valid_selection_types(self):
         """Test that selection algorithm types are accepted."""

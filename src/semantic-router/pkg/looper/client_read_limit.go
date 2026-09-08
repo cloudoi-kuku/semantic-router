@@ -35,12 +35,12 @@ const maxErrorBodyBytes int64 = 8 * 1024
 func (c *Client) readResponseBody(resp *http.Response) ([]byte, error) {
 	if resp.StatusCode != http.StatusOK {
 		errBody, truncated := httputil.ReadTruncatedBody(resp.Body, maxErrorBodyBytes)
-		return nil, fmt.Errorf(
-			"request failed with status %d (error_body_bytes=%d, truncated=%t)",
-			resp.StatusCode,
-			len(errBody),
-			truncated,
-		)
+		return nil, &HTTPStatusError{
+			StatusCode:       resp.StatusCode,
+			BodyBytes:        len(errBody),
+			Truncated:        truncated,
+			ProviderAttempts: providerAttemptCount(resp),
+		}
 	}
 
 	respBody, err := httputil.ReadLimitedBody(resp.Body, c.maxResponseBytes)

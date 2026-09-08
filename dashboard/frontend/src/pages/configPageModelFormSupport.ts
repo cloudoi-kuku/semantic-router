@@ -127,8 +127,14 @@ export function normalizeModelReliability(value: unknown): ProviderReliability |
     'health_check_path',
     'health_check_interval',
     'health_check_timeout',
+    'circuit_breaker_open_time',
   ] as const
-  const numberFields = ['retry_count', 'consecutive_5xx', 'max_ejection_percent'] as const
+  const numberFields = [
+    'retry_count',
+    'consecutive_5xx',
+    'max_ejection_percent',
+    'circuit_breaker_failures',
+  ] as const
 
   for (const field of stringFields) {
     if (typeof source[field] === 'string' && source[field].trim()) {

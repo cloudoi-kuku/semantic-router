@@ -115,10 +115,14 @@ func convertToTemplateSyntax(s string) string {
 	// Replace ${var} with {{.var}}
 	// Handle common variable names
 	replacements := map[string]string{
-		"${user_content}":     "{{.user_content}}",
-		"${matched_domains}":  "{{.matched_domains}}",
-		"${matched_keywords}": "{{.matched_keywords}}",
-		"${decision_name}":    "{{.decision_name}}",
+		"${user_content}":      "{{.user_content}}",
+		"${matched_domains}":   "{{.matched_domains}}",
+		"${matched_keywords}":  "{{.matched_keywords}}",
+		"${decision_name}":     "{{.decision_name}}",
+		"{{user_content}}":     "{{.user_content}}",
+		"{{matched_domains}}":  "{{.matched_domains}}",
+		"{{matched_keywords}}": "{{.matched_keywords}}",
+		"{{decision_name}}":    "{{.decision_name}}",
 	}
 
 	result := s

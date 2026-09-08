@@ -42,6 +42,12 @@ func TestHandleRoutingDecisionReturnsPrivacyMinimizedDecision(t *testing.T) {
 			Tool:           services.WorkflowToolPlan{Type: "web_search", Provider: "searxng", MaxResults: 5},
 			SynthesisModel: "niffy-reasoning",
 		},
+		Resilience: &services.ResilienceEvaluation{
+			ContractVersion: config.ResilienceContractVersion,
+			Type:            "ordered_fallback", Status: "planned", MaxAttempts: 2,
+			RetryOn: []string{"server_error"}, CandidateModels: []string{"niffy-reasoning"},
+			ExecutesModels: false,
+		},
 		DecisionResult: &services.EvalDecisionResult{
 			DecisionName: "reasoning-route",
 			Algorithm:    "static",
@@ -90,6 +96,9 @@ func assertRoutingDecisionResponse(t *testing.T, response RoutingDecisionEnvelop
 	assertRoutingDecisionCost(t, response)
 	if response.Workflow == nil || response.Workflow.ContractVersion != config.WorkflowContractVersion || response.Workflow.ExecutesTools {
 		t.Fatalf("missing or unsafe workflow preview: %+v", response.Workflow)
+	}
+	if response.Resilience == nil || response.Resilience.ContractVersion != config.ResilienceContractVersion || response.Resilience.ExecutesModels {
+		t.Fatalf("missing or unsafe resilience preview: %+v", response.Resilience)
 	}
 }
 

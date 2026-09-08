@@ -35,6 +35,9 @@ static_resources:
               - "x-vsr-looper-iteration"
               - "x-authz-user-id"
               - "x-authz-user-groups"
+              # Emit x-envoy-attempt-count so the router can account for
+              # same-model retries without adding request-content labels.
+              include_attempt_count_in_response: true
               routes:
               {% for model in models %}
               # Route for model: {{ model.name }}

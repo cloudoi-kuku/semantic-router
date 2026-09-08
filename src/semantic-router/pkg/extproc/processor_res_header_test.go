@@ -22,6 +22,18 @@ func TestGetStatusFromHeadersUsesRawValue(t *testing.T) {
 	}
 }
 
+func TestResponseAttemptCountUsesEnvoyEvidence(t *testing.T) {
+	headers := &core.HeaderMap{Headers: []*core.HeaderValue{{
+		Key: "x-envoy-attempt-count", Value: "3",
+	}}}
+	if got := responseAttemptCount(headers); got != 3 {
+		t.Fatalf("responseAttemptCount() = %d, want 3", got)
+	}
+	if got := responseAttemptCount(nil); got != 1 {
+		t.Fatalf("responseAttemptCount(nil) = %d, want conservative initial attempt", got)
+	}
+}
+
 func TestHandleResponseHeadersSetsStreamingModeOverride(t *testing.T) {
 	router := &OpenAIRouter{}
 	ctx := &RequestContext{}

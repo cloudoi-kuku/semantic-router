@@ -3,6 +3,7 @@ package extproc
 import (
 	"net/url"
 	"sort"
+	"strconv"
 
 	ext_proc "github.com/envoyproxy/go-control-plane/envoy/service/ext_proc/v3"
 
@@ -11,18 +12,19 @@ import (
 )
 
 type routerReplayAggregateResponse struct {
-	Object               string                            `json:"object"`
-	RecordCount          int                               `json:"record_count"`
-	Lifecycle            routerReplayLifecycleSummary      `json:"lifecycle"`
-	Summary              routerReplayAggregateCostSummary  `json:"summary"`
-	ModelSelection       []routerReplayAggregateValue      `json:"model_selection"`
-	DecisionDistribution []routerReplayAggregateValue      `json:"decision_distribution"`
-	SignalDistribution   []routerReplayAggregateValue      `json:"signal_distribution"`
-	TokenVolume          routerReplayAggregateTokenVolume  `json:"token_volume"`
-	TokenBreakdown       routerReplayAggregateTokenBuckets `json:"token_breakdown"`
-	AvailableRecipes     []string                          `json:"available_recipes"`
-	AvailableDecisions   []string                          `json:"available_decisions"`
-	AvailableModels      []string                          `json:"available_models"`
+	Object               string                               `json:"object"`
+	RecordCount          int                                  `json:"record_count"`
+	Lifecycle            routerReplayLifecycleSummary         `json:"lifecycle"`
+	Summary              routerReplayAggregateCostSummary     `json:"summary"`
+	ModelSelection       []routerReplayAggregateValue         `json:"model_selection"`
+	DecisionDistribution []routerReplayAggregateValue         `json:"decision_distribution"`
+	SignalDistribution   []routerReplayAggregateValue         `json:"signal_distribution"`
+	TokenVolume          routerReplayAggregateTokenVolume     `json:"token_volume"`
+	TokenBreakdown       routerReplayAggregateTokenBuckets    `json:"token_breakdown"`
+	ExecutionEvidence    routerReplayExecutionEvidenceSummary `json:"execution_evidence"`
+	AvailableRecipes     []string                             `json:"available_recipes"`
+	AvailableDecisions   []string                             `json:"available_decisions"`
+	AvailableModels      []string                             `json:"available_models"`
 }
 
 type routerReplayLifecycleSummary struct {
@@ -66,6 +68,19 @@ type routerReplayAggregateTokenEntry struct {
 	TotalTokens  int    `json:"total_tokens"`
 }
 
+type routerReplayExecutionEvidenceSummary struct {
+	RecordCount          int   `json:"record_count"`
+	ModelAttempts        int   `json:"model_attempts"`
+	ProviderAttempts     int   `json:"provider_attempts"`
+	ProviderRetries      int   `json:"provider_retries"`
+	FallbackRetries      int   `json:"fallback_retries"`
+	FallbackRequestCount int   `json:"fallback_request_count"`
+	QualityPassed        int   `json:"quality_passed"`
+	QualityFailed        int   `json:"quality_failed"`
+	QualityNotMeasured   int   `json:"quality_not_measured"`
+	TotalLatencyMS       int64 `json:"total_latency_ms"`
+}
+
 func (r *OpenAIRouter) handleRouterReplayAggregateAPI(
 	method string,
 	rawQuery string,
@@ -103,10 +118,59 @@ func buildRouterReplayAggregatePayload(
 		SignalDistribution:   buildRouterReplaySignalDistribution(filteredRecords),
 		TokenVolume:          buildRouterReplayTokenVolume(filteredRecords),
 		TokenBreakdown:       buildRouterReplayTokenBreakdown(filteredRecords),
+		ExecutionEvidence:    buildRouterReplayExecutionEvidence(filteredRecords),
 		AvailableRecipes:     collectRouterReplayRecipeOptions(allRecords),
 		AvailableDecisions:   collectRouterReplayDecisionOptions(allRecords),
 		AvailableModels:      collectRouterReplayModelOptions(allRecords),
 	}
+}
+
+func buildRouterReplayExecutionEvidence(
+	records []routerreplay.RoutingRecord,
+) routerReplayExecutionEvidenceSummary {
+	summary := routerReplayExecutionEvidenceSummary{}
+	for _, record := range records {
+		outcome, ok := executionEvidenceOutcome(record.Outcomes)
+		if !ok {
+			continue
+		}
+		summary.RecordCount++
+		summary.ModelAttempts += evidenceMetadataInt(outcome.Metadata, "model_attempts")
+		summary.ProviderAttempts += evidenceMetadataInt(outcome.Metadata, "provider_attempts")
+		summary.ProviderRetries += evidenceMetadataInt(outcome.Metadata, "provider_retries")
+		summary.FallbackRetries += evidenceMetadataInt(outcome.Metadata, "fallback_retries")
+		summary.TotalLatencyMS += int64(evidenceMetadataInt(outcome.Metadata, "latency_ms"))
+		if outcome.Metadata["fallback_used"] == "true" {
+			summary.FallbackRequestCount++
+		}
+		switch outcome.Metadata["quality_status"] {
+		case "passed":
+			summary.QualityPassed++
+		case "failed":
+			summary.QualityFailed++
+		default:
+			summary.QualityNotMeasured++
+		}
+	}
+	return summary
+}
+
+func executionEvidenceOutcome(outcomes []routerreplay.Outcome) (routerreplay.Outcome, bool) {
+	for index := len(outcomes) - 1; index >= 0; index-- {
+		if outcomes[index].Source == executionEvidenceOutcomeSource &&
+			outcomes[index].Metadata["contract_version"] == executionEvidenceContractVersion {
+			return outcomes[index], true
+		}
+	}
+	return routerreplay.Outcome{}, false
+}
+
+func evidenceMetadataInt(metadata map[string]string, key string) int {
+	value, err := strconv.Atoi(metadata[key])
+	if err != nil || value < 0 {
+		return 0
+	}
+	return value
 }
 
 func buildRouterReplayLifecycleSummary(

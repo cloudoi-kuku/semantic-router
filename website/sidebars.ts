@@ -144,6 +144,7 @@ const sidebars: SidebarsConfig = {
               label: 'Looper',
               items: [
                 'tutorials/algorithm/looper/confidence',
+                'tutorials/algorithm/looper/fallback',
                 'tutorials/algorithm/looper/fusion',
                 'tutorials/algorithm/looper/ratings',
                 'tutorials/algorithm/looper/remom',

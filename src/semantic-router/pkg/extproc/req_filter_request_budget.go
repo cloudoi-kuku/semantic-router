@@ -22,13 +22,14 @@ func (r *OpenAIRouter) applyRuntimeRequestBudget(
 	decisionName string,
 	ctx *RequestContext,
 ) ([]config.ModelRef, error) {
-	if decision == nil || decision.RequestBudget == nil {
+	if decision == nil {
 		return refs, nil
 	}
 	result := r.requestBudgetEligibleModelRefs(
 		refs, decision.RequestBudget, ctx.VSRContextTokenCount,
 		ctx.VSROutputTokenBound, ctx.VSRReasoningTokenBound, time.Now().UTC(),
 	)
+	result = r.boundFallbackChain(result, decision)
 	ctx.VSREligibleModelRefs = cloneModelRefs(result.eligible)
 	if len(result.eligible) == 0 {
 		return nil, fmt.Errorf(
@@ -90,7 +91,10 @@ func (r *OpenAIRouter) estimateCandidateCost(
 	now time.Time,
 ) (services.CandidateCostEstimate, *services.ModelEligibilityExclusion) {
 	model := strings.TrimSpace(ref.Model)
-	estimate := services.CandidateCostEstimate{Model: model, Eligible: true, Status: "within_budget"}
+	estimate := services.CandidateCostEstimate{Model: model, Eligible: true, Status: "within_budget", MaxProviderAttempts: 1}
+	if reliability, ok := r.Config.GetProviderReliability(model); ok {
+		estimate.MaxProviderAttempts += reliability.RetryCount
+	}
 	exclusion := &services.ModelEligibilityExclusion{Model: model}
 	pricing, configured := r.Config.GetFullModelPricing(model)
 	if !configured {
@@ -118,9 +122,10 @@ func (r *OpenAIRouter) estimateCandidateCost(
 		exclusion.Reasons = append(exclusion.Reasons, "pricing_stale")
 		return estimate, exclusion
 	}
-	estimate.EstimatedCost = modelpricing.EstimatedCost(modelpricing.Estimate{
+	estimate.SingleAttemptEstimatedCost = modelpricing.EstimatedCost(modelpricing.Estimate{
 		InputTokens: inputTokens, OutputTokens: outputTokens, ReasoningTokens: reasoningTokens,
 	}, modelPricingRates(pricing))
+	estimate.EstimatedCost = estimate.SingleAttemptEstimatedCost * float64(estimate.MaxProviderAttempts)
 	if estimate.EstimatedCost > budget.MaxEstimatedCost {
 		estimate.Status = "budget_exceeded"
 		estimate.Eligible = false
@@ -128,6 +133,74 @@ func (r *OpenAIRouter) estimateCandidateCost(
 		return estimate, exclusion
 	}
 	return estimate, nil
+}
+
+func (r *OpenAIRouter) boundFallbackChain(
+	result requestBudgetResult,
+	decision *config.Decision,
+) requestBudgetResult {
+	if decision == nil || decision.Algorithm == nil ||
+		decision.Algorithm.Type != config.DecisionAlgorithmFallback ||
+		decision.Algorithm.Fallback == nil {
+		return result
+	}
+	maxAttempts := decision.Algorithm.Fallback.MaxAttempts
+	bounded := make([]config.ModelRef, 0, min(maxAttempts, len(result.eligible)))
+	cumulative := 0.0
+	for _, ref := range result.eligible {
+		estimate := candidateEstimateForModel(result.evaluation, ref.Model)
+		reason := fallbackExclusionReason(
+			len(bounded), maxAttempts, cumulative, estimate, decision.RequestBudget,
+		)
+		if reason != "" {
+			result.exclusions = append(result.exclusions, services.ModelEligibilityExclusion{
+				Model: ref.Model, Reasons: []string{reason},
+			})
+			if estimate != nil {
+				estimate.Eligible = false
+				estimate.Status = reason
+			}
+			continue
+		}
+		bounded = append(bounded, ref)
+		if estimate != nil {
+			cumulative += estimate.EstimatedCost
+		}
+	}
+	result.eligible = bounded
+	return result
+}
+
+func fallbackExclusionReason(
+	selected int,
+	maxAttempts int,
+	cumulative float64,
+	estimate *services.CandidateCostEstimate,
+	budget *config.RequestBudget,
+) string {
+	if selected >= maxAttempts {
+		return "fallback_attempt_limit"
+	}
+	if budget != nil && estimate != nil &&
+		cumulative+estimate.EstimatedCost > budget.MaxEstimatedCost {
+		return "fallback_chain_budget_exceeded"
+	}
+	return ""
+}
+
+func candidateEstimateForModel(
+	evaluation *services.RequestCostEvaluation,
+	model string,
+) *services.CandidateCostEstimate {
+	if evaluation == nil {
+		return nil
+	}
+	for index := range evaluation.Candidates {
+		if evaluation.Candidates[index].Model == model {
+			return &evaluation.Candidates[index]
+		}
+	}
+	return nil
 }
 
 func pricingIsCurrent(pricing config.ModelPricing, now time.Time) bool {

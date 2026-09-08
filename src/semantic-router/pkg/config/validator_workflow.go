@@ -29,16 +29,63 @@ func validateWorkflowContracts(cfg *RouterConfig) error {
 
 func validateDecisionWorkflow(decisionName string, workflow *WorkflowConfig) error {
 	prefix := fmt.Sprintf("routing.decisions[%s].workflow", decisionName)
-	if workflow.Type != WorkflowWebSearchAnswer {
-		return fmt.Errorf("%s.type must be %q", prefix, WorkflowWebSearchAnswer)
-	}
 	if strings.TrimSpace(workflow.AuthorizationGroup) == "" {
 		return fmt.Errorf("%s.authorization_group is required", prefix)
 	}
-	if workflow.WebSearch == nil {
-		return fmt.Errorf("%s.web_search is required", prefix)
+	switch workflow.Type {
+	case WorkflowWebSearchAnswer:
+		if workflow.WebSearch == nil || workflow.MCP != nil {
+			return fmt.Errorf("%s must define only web_search for type %q", prefix, workflow.Type)
+		}
+		return validateWebSearchWorkflow(prefix+".web_search", workflow.WebSearch)
+	case WorkflowMCPToolCall:
+		if workflow.MCP == nil || workflow.WebSearch != nil {
+			return fmt.Errorf("%s must define only mcp for type %q", prefix, workflow.Type)
+		}
+		return validateMCPWorkflow(prefix+".mcp", workflow.MCP)
+	default:
+		return fmt.Errorf("%s.type must be %q or %q", prefix, WorkflowWebSearchAnswer, WorkflowMCPToolCall)
 	}
-	return validateWebSearchWorkflow(prefix+".web_search", workflow.WebSearch)
+}
+
+func validateMCPWorkflow(prefix string, workflow *MCPWorkflowConfig) error {
+	if err := validateMCPIdentityAndEndpoint(prefix, workflow); err != nil {
+		return err
+	}
+	if !workflow.RequireReadOnly {
+		return fmt.Errorf("%s.require_read_only must be true", prefix)
+	}
+	if err := validateWorkflowCredential(prefix, workflow.APIKeyEnv, workflow.APIKeyHeader); err != nil {
+		return err
+	}
+	return validateMCPBounds(prefix, workflow)
+}
+
+func validateMCPIdentityAndEndpoint(prefix string, workflow *MCPWorkflowConfig) error {
+	if strings.TrimSpace(workflow.ServerName) == "" {
+		return fmt.Errorf("%s.server_name is required", prefix)
+	}
+	if strings.TrimSpace(workflow.ToolName) == "" {
+		return fmt.Errorf("%s.tool_name is required", prefix)
+	}
+	endpoint, err := url.ParseRequestURI(strings.TrimSpace(workflow.Endpoint))
+	if err != nil || (endpoint.Scheme != "http" && endpoint.Scheme != "https") || endpoint.Host == "" {
+		return fmt.Errorf("%s.endpoint must be an absolute HTTP(S) URL", prefix)
+	}
+	return nil
+}
+
+func validateMCPBounds(prefix string, workflow *MCPWorkflowConfig) error {
+	if workflow.TimeoutSeconds < 1 || workflow.TimeoutSeconds > 30 {
+		return fmt.Errorf("%s.timeout_seconds must be between 1 and 30", prefix)
+	}
+	if workflow.MaxResponseBytes < 1024 || workflow.MaxResponseBytes > 4*1024*1024 {
+		return fmt.Errorf("%s.max_response_bytes must be between 1024 and 4194304", prefix)
+	}
+	if workflow.MaxResultCharacters < 128 || workflow.MaxResultCharacters > 20000 {
+		return fmt.Errorf("%s.max_result_characters must be between 128 and 20000", prefix)
+	}
+	return nil
 }
 
 func validateWebSearchWorkflow(prefix string, search *WebSearchWorkflowConfig) error {
@@ -56,13 +103,17 @@ func validateWebSearchWorkflow(prefix string, search *WebSearchWorkflowConfig) e
 }
 
 func validateWebSearchCredential(prefix string, search *WebSearchWorkflowConfig) error {
-	if search.APIKeyEnv != "" && !workflowSecretEnvPattern.MatchString(search.APIKeyEnv) {
+	return validateWorkflowCredential(prefix, search.APIKeyEnv, search.APIKeyHeader)
+}
+
+func validateWorkflowCredential(prefix, apiKeyEnv, apiKeyHeader string) error {
+	if apiKeyEnv != "" && !workflowSecretEnvPattern.MatchString(apiKeyEnv) {
 		return fmt.Errorf("%s.api_key_env must name an uppercase environment variable", prefix)
 	}
-	if search.APIKeyEnv != "" && strings.TrimSpace(search.APIKeyHeader) == "" {
+	if apiKeyEnv != "" && strings.TrimSpace(apiKeyHeader) == "" {
 		return fmt.Errorf("%s.api_key_header is required when api_key_env is set", prefix)
 	}
-	if search.APIKeyHeader != "" && !workflowHeaderPattern.MatchString(search.APIKeyHeader) {
+	if apiKeyHeader != "" && !workflowHeaderPattern.MatchString(apiKeyHeader) {
 		return fmt.Errorf("%s.api_key_header must be a valid HTTP header name", prefix)
 	}
 	return nil

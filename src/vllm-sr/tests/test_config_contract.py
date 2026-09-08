@@ -230,6 +230,32 @@ def test_decision_accepts_bounded_authorized_web_search_workflow():
         )
 
 
+def test_decision_accepts_bounded_read_only_mcp_workflow():
+    decision = Decision.model_validate(
+        {
+            "name": "mcp",
+            "priority": 10,
+            "rules": {},
+            "modelRefs": [],
+            "workflow": {
+                "type": "mcp_tool_call",
+                "authorization_group": "mcp-users",
+                "mcp": {
+                    "server_name": "catalog",
+                    "endpoint": "https://mcp.example.com",
+                    "tool_name": "lookup",
+                    "arguments": {"query": "${user_content}"},
+                    "timeout_seconds": 5,
+                    "max_response_bytes": 262144,
+                    "max_result_characters": 8000,
+                    "require_read_only": True,
+                },
+            },
+        }
+    )
+    assert decision.workflow.mcp.tool_name == "lookup"
+
+
 def test_decision_enforces_minimum_candidates_after_materialization():
     with pytest.raises(ValueError, match="minimum_candidates=2"):
         Decision(

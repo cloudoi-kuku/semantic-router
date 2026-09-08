@@ -358,6 +358,10 @@ routing:
         "retry_on": "connect-failure,refused-stream",
         "num_retries": 2,
     }
+    virtual_host = rendered["static_resources"]["listeners"][0]["filter_chains"][0][
+        "filters"
+    ][0]["typed_config"]["route_config"]["virtual_hosts"][0]
+    assert virtual_host["include_attempt_count_in_response"] is True
     cluster = _cluster_by_name(rendered, "test_model_cluster")
     assert cluster["lb_policy"] == "LEAST_REQUEST"
     assert cluster["least_request_lb_config"]["choice_count"] == 2

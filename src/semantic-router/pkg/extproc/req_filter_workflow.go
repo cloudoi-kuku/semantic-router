@@ -62,28 +62,46 @@ func (r *OpenAIRouter) executeDecisionWorkflow(ctx *RequestContext, decisionName
 	}
 	ctx.VSRWorkflowStatus = "authorized"
 
+	evidenceCount, err := r.executeAuthorizedWorkflow(ctx, workflow)
+	if err != nil {
+		ctx.VSRWorkflowStatus = "failed"
+		return err
+	}
+	ctx.VSRWorkflowStatus = "completed"
+	ctx.VSRWorkflowEvidenceCount = evidenceCount
+	return nil
+}
+
+func (r *OpenAIRouter) executeAuthorizedWorkflow(ctx *RequestContext, workflow *config.WorkflowConfig) (int, error) {
 	switch workflow.Type {
 	case config.WorkflowWebSearchAnswer:
-		evidence, err := executeSearXNGSearch(ctx, workflow.WebSearch)
+		return executeWebSearchWorkflow(ctx, workflow.WebSearch)
+	case config.WorkflowMCPToolCall:
+		result, err := r.executeMCPWorkflow(ctx, workflow.MCP)
 		if err != nil {
-			ctx.VSRWorkflowStatus = "failed"
-			return fmt.Errorf("web-search workflow failed: %w", err)
+			return 0, fmt.Errorf("MCP workflow failed: %w", err)
 		}
-		if len(evidence) == 0 {
-			ctx.VSRWorkflowStatus = "failed"
-			return errors.New("web-search workflow failed: search returned no usable evidence")
+		if err := injectMCPResult(ctx, workflow.MCP, result); err != nil {
+			return 0, fmt.Errorf("MCP result injection failed: %w", err)
 		}
-		if err := injectWebSearchEvidence(ctx, workflow.WebSearch, evidence); err != nil {
-			ctx.VSRWorkflowStatus = "failed"
-			return fmt.Errorf("web-search evidence injection failed: %w", err)
-		}
-		ctx.VSRWorkflowStatus = "completed"
-		ctx.VSRWorkflowEvidenceCount = len(evidence)
-		return nil
+		return 1, nil
 	default:
-		ctx.VSRWorkflowStatus = "failed"
-		return fmt.Errorf("unsupported workflow type %q", workflow.Type)
+		return 0, fmt.Errorf("unsupported workflow type %q", workflow.Type)
 	}
+}
+
+func executeWebSearchWorkflow(ctx *RequestContext, search *config.WebSearchWorkflowConfig) (int, error) {
+	evidence, err := executeSearXNGSearch(ctx, search)
+	if err != nil {
+		return 0, fmt.Errorf("web-search workflow failed: %w", err)
+	}
+	if len(evidence) == 0 {
+		return 0, errors.New("web-search workflow failed: search returned no usable evidence")
+	}
+	if err := injectWebSearchEvidence(ctx, search, evidence); err != nil {
+		return 0, fmt.Errorf("web-search evidence injection failed: %w", err)
+	}
+	return len(evidence), nil
 }
 
 func (r *OpenAIRouter) workflowGroupAuthorized(ctx *RequestContext, required string) bool {
@@ -99,10 +117,11 @@ func executeSearXNGSearch(ctx *RequestContext, search *config.WebSearchWorkflowC
 	if search == nil {
 		return nil, errors.New("web-search configuration is missing")
 	}
-	req, err := buildSearXNGRequest(ctx, search)
+	req, cancel, err := buildSearXNGRequest(ctx, search)
 	if err != nil {
 		return nil, err
 	}
+	defer cancel()
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("request: %w", err)
@@ -122,17 +141,20 @@ func executeSearXNGSearch(ctx *RequestContext, search *config.WebSearchWorkflowC
 	return normalizeSearXNGEvidence(decoded, search.MaxResults), nil
 }
 
-func buildSearXNGRequest(ctx *RequestContext, search *config.WebSearchWorkflowConfig) (*http.Request, error) {
+func buildSearXNGRequest(
+	ctx *RequestContext,
+	search *config.WebSearchWorkflowConfig,
+) (*http.Request, context.CancelFunc, error) {
 	query := strings.TrimSpace(ctx.UserContent)
 	if query == "" {
-		return nil, errors.New("web-search query is empty")
+		return nil, nil, errors.New("web-search query is empty")
 	}
 	if utf8.RuneCountInString(query) > search.MaxQueryCharacters {
-		return nil, errWorkflowInvalidQuery
+		return nil, nil, errWorkflowInvalidQuery
 	}
 	endpoint, err := url.Parse(search.Endpoint)
 	if err != nil {
-		return nil, fmt.Errorf("parse endpoint: %w", err)
+		return nil, nil, fmt.Errorf("parse endpoint: %w", err)
 	}
 	params := endpoint.Query()
 	params.Set("q", query)
@@ -144,22 +166,24 @@ func buildSearXNGRequest(ctx *RequestContext, search *config.WebSearchWorkflowCo
 		requestCtx = context.Background()
 	}
 	requestCtx, cancel := context.WithTimeout(requestCtx, time.Duration(search.TimeoutSeconds)*time.Second)
-	defer cancel()
 	req, err := http.NewRequestWithContext(requestCtx, http.MethodGet, endpoint.String(), nil)
 	if err != nil {
-		return nil, fmt.Errorf("create request: %w", err)
+		cancel()
+		return nil, nil, fmt.Errorf("create request: %w", err)
 	}
 	if search.APIKeyEnv != "" {
 		key := strings.TrimSpace(os.Getenv(search.APIKeyEnv))
 		if key == "" {
-			return nil, fmt.Errorf("required search credential %s is empty", search.APIKeyEnv)
+			cancel()
+			return nil, nil, fmt.Errorf("required search credential %s is empty", search.APIKeyEnv)
 		}
 		if err := validateHeaderName(search.APIKeyHeader); err != nil {
-			return nil, fmt.Errorf("invalid search credential header: %w", err)
+			cancel()
+			return nil, nil, fmt.Errorf("invalid search credential header: %w", err)
 		}
 		req.Header.Set(search.APIKeyHeader, key)
 	}
-	return req, nil
+	return req, cancel, nil
 }
 
 func normalizeSearXNGEvidence(response searXNGResponse, maxResults int) []webSearchEvidence {

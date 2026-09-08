@@ -161,6 +161,13 @@ List and aggregate requests accept filters such as `recipe`, `decision`,
 and `offset`; `limit` is capped at 100. `showDetails=true` requests large body
 fields, so use it only when those fields are needed.
 
+Completed executions may include a versioned `router_execution` outcome with
+content-free usage, actual and baseline cost, savings, latency, model/provider
+attempts, fallback, and quality status. The aggregate response summarizes these
+under `execution_evidence`. `quality_status: not_measured` means no configured
+quality guard produced evidence; an HTTP success is not treated as a quality
+measurement.
+
 When bearer authentication is enabled, replay callers need `replay.read`.
 Prompt, response, tool, and other sensitive details remain redacted unless the
 principal also has `replay.detail`. Treat replay storage as potentially

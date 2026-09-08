@@ -36,7 +36,9 @@ export interface RoutingDecisionCost {
   max_cost: number
   candidates: Array<{
     model: string
+    single_attempt_estimated_cost?: number
     estimated_cost?: number
+    max_provider_attempts?: number
     eligible: boolean
     status: string
     price_version?: string
@@ -46,6 +48,16 @@ export interface RoutingDecisionCost {
   }>
 }
 
+export interface RoutingDecisionResilience {
+  contract_version: string
+  type: string
+  status: string
+  max_attempts: number
+  retry_on: string[]
+  candidate_models?: string[]
+  executes_models: boolean
+}
+
 export interface RoutingDecisionWorkflow {
   contract_version: string
   type: string
@@ -53,11 +65,15 @@ export interface RoutingDecisionWorkflow {
   authorization: { required_group: string; status: string }
   tool: {
     type: string
-    provider: string
-    max_results: number
+    provider?: string
+    server_name?: string
+    tool_name?: string
+    max_results?: number
     timeout_seconds: number
     max_response_bytes: number
-    max_evidence_characters: number
+    max_evidence_characters?: number
+    max_result_characters?: number
+    requires_read_only?: boolean
   }
   synthesis_model?: string
   executes_tools: boolean
@@ -88,6 +104,7 @@ export interface RoutingDecisionEnvelope {
   eligibility?: RoutingDecisionEligibility
   cost?: RoutingDecisionCost
   workflow?: RoutingDecisionWorkflow
+  resilience?: RoutingDecisionResilience
   signals: RoutingDecisionSignals
   diagnostics?: {
     signal_errors?: Record<string, string>

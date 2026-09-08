@@ -60,6 +60,18 @@ func TestPopulateEvalModelSelectionReturnsConcreteRuntimeChoice(t *testing.T) {
 	assertConcreteRuntimeChoice(t, selector, response, matchedDecision)
 }
 
+func TestWorkflowEvaluationDescribesMCPWithoutExecutingIt(t *testing.T) {
+	evaluation := workflowEvaluation(&config.WorkflowConfig{
+		Type: config.WorkflowMCPToolCall, AuthorizationGroup: "mcp-users",
+		MCP: &config.MCPWorkflowConfig{ServerName: "catalog", ToolName: "lookup", TimeoutSeconds: 5,
+			MaxResponseBytes: 262144, MaxResultCharacters: 8000, RequireReadOnly: true},
+	}, "synth")
+	if evaluation == nil || evaluation.ExecutesTools || evaluation.Tool.Type != "mcp" ||
+		evaluation.Tool.ToolName != "lookup" || !evaluation.Tool.RequiresReadOnly {
+		t.Fatalf("MCP workflow evaluation = %+v", evaluation)
+	}
+}
+
 func assertConcreteRuntimeChoice(
 	t *testing.T,
 	selector *evalModelSelectorStub,

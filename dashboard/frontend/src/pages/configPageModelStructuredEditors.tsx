@@ -175,6 +175,20 @@ const reliabilityFields: ObjectEditorField<ProviderReliability>[] = [
     step: 1,
     placeholder: '50',
   },
+  {
+    key: 'circuit_breaker_failures',
+    label: 'Failures before circuit opens',
+    type: 'number',
+    min: 0,
+    max: 100,
+    step: 1,
+    placeholder: '3',
+  },
+  {
+    key: 'circuit_breaker_open_time',
+    label: 'Circuit open time',
+    placeholder: '30s',
+  },
 ]
 
 function backendRefLabel(item: BackendRefEntry, index: number): string {

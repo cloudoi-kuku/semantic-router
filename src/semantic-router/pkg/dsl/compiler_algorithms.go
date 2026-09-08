@@ -5,6 +5,9 @@ import "github.com/vllm-project/semantic-router/src/semantic-router/pkg/config"
 type algorithmSubConfigCompiler func(*Compiler, *config.AlgorithmConfig, map[string]Value)
 
 var algorithmSubConfigCompilers = map[string]algorithmSubConfigCompiler{
+	"fallback": func(c *Compiler, algo *config.AlgorithmConfig, fields map[string]Value) {
+		algo.Fallback = c.compileFallbackAlgo(fields)
+	},
 	"confidence": func(c *Compiler, algo *config.AlgorithmConfig, fields map[string]Value) {
 		algo.Confidence = c.compileConfidenceAlgo(fields)
 	},
@@ -43,6 +46,17 @@ var algorithmSubConfigCompilers = map[string]algorithmSubConfigCompiler{
 	"kmeans": func(*Compiler, *config.AlgorithmConfig, map[string]Value) {},
 	"mlp":    func(*Compiler, *config.AlgorithmConfig, map[string]Value) {},
 	"svm":    func(*Compiler, *config.AlgorithmConfig, map[string]Value) {},
+}
+
+func (c *Compiler) compileFallbackAlgo(fields map[string]Value) *config.FallbackAlgorithmConfig {
+	cfg := &config.FallbackAlgorithmConfig{}
+	if v, ok := getIntField(fields, "max_attempts"); ok {
+		cfg.MaxAttempts = v
+	}
+	if v, ok := getStringArrayField(fields, "retry_on"); ok {
+		cfg.RetryOn = v
+	}
+	return cfg
 }
 
 func (c *Compiler) compilePromptAlgo(

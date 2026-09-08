@@ -69,6 +69,13 @@ func rawWorkflowToDecl(raw *rawWorkflowDecl) *WorkflowDecl {
 	workflow.MaxQueryCharacters, _ = getIntField(fields, "max_query_characters")
 	workflow.MaxResponseBytes, _ = getIntField(fields, "max_response_bytes")
 	workflow.MaxEvidenceCharacters, _ = getIntField(fields, "max_evidence_characters")
+	workflow.ServerName, _ = getStringField(fields, "server_name")
+	workflow.ToolName, _ = getStringField(fields, "tool_name")
+	if arguments, ok := fields["arguments"].(ObjectValue); ok {
+		workflow.Arguments = fieldsToMap(arguments.Fields)
+	}
+	workflow.MaxResultCharacters, _ = getIntField(fields, "max_result_characters")
+	workflow.RequireReadOnly, _ = getBoolField(fields, "require_read_only")
 	return workflow
 }
 

@@ -489,6 +489,11 @@ type WorkflowDecl struct {
 	MaxQueryCharacters    int
 	MaxResponseBytes      int
 	MaxEvidenceCharacters int
+	ServerName            string
+	ToolName              string
+	Arguments             map[string]interface{}
+	MaxResultCharacters   int
+	RequireReadOnly       bool
 }
 
 // ActionDecl is the resolved AST node for a route ACTION statement.

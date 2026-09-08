@@ -47,6 +47,9 @@ func (r *OpenAIRouter) eligibleModelRefs(
 	result := modelEligibilityResult{eligible: make([]config.ModelRef, 0, len(refs))}
 	for _, ref := range refs {
 		exclusion := services.ModelEligibilityExclusion{Model: ref.Model}
+		if r.modelCircuitOpen(ref.Model, time.Now()) {
+			exclusion.Reasons = append(exclusion.Reasons, "circuit_open")
+		}
 		if r.modelRefExceedsContextWindow(ref, contextTokens) {
 			exclusion.Reasons = append(exclusion.Reasons, "context_window")
 		}

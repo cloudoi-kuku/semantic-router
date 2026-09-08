@@ -1,6 +1,10 @@
 package extproc
 
-import "github.com/vllm-project/semantic-router/src/semantic-router/pkg/routerreplay"
+import (
+	"github.com/vllm-project/semantic-router/src/semantic-router/pkg/looper"
+	"github.com/vllm-project/semantic-router/src/semantic-router/pkg/observability/metrics"
+	"github.com/vllm-project/semantic-router/src/semantic-router/pkg/routerreplay"
+)
 
 func (r *OpenAIRouter) buildReplayUsageCost(ctx *RequestContext, usage responseUsageMetrics) routerreplay.UsageCost {
 	totalTokens := usage.promptTokens + usage.completionTokens
@@ -61,4 +65,20 @@ func replayFloat64Ptr(value float64) *float64 {
 
 func replayStringPtr(value string) *string {
 	return &value
+}
+
+func (r *OpenAIRouter) updateFallbackReplayCost(ctx *RequestContext, response *looper.Response) {
+	if r == nil || r.Config == nil || ctx == nil || response == nil {
+		return
+	}
+	usage := responseUsageMetrics{
+		promptTokens: int(response.Usage.PromptTokens), promptTokensReported: true,
+		completionTokens: int(response.Usage.CompletionTokens), completionTokensReported: true,
+		totalTokens: int(response.Usage.TotalTokens), totalTokensReported: true,
+	}
+	snapshot := r.buildReplayUsageCost(ctx, usage)
+	r.updateRouterReplayUsageCost(ctx, snapshot)
+	if snapshot.ActualCost != nil && snapshot.Currency != nil {
+		metrics.RecordModelCost(response.Model, *snapshot.Currency, *snapshot.ActualCost)
+	}
 }

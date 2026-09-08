@@ -88,6 +88,8 @@ type OpenAIRouter struct {
 	routerLearningRuntime   *routerLearningRuntime
 	lookupTableCancel       func()
 	routerSessionStateStore *sessiontelemetry.RouterSessionStateStoreSlot
+	providerHealthMu        sync.Mutex
+	providerHealth          map[string]providerHealthState
 
 	resources *resourceScope
 }

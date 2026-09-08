@@ -5,6 +5,9 @@ import "github.com/vllm-project/semantic-router/src/semantic-router/pkg/config"
 type algorithmFieldExporter func(*config.AlgorithmConfig, map[string]Value)
 
 var algorithmFieldExporters = map[string]algorithmFieldExporter{
+	"fallback": func(algo *config.AlgorithmConfig, fields map[string]Value) {
+		fallbackAlgorithmToFields(algo.Fallback, fields)
+	},
 	"confidence": func(algo *config.AlgorithmConfig, fields map[string]Value) {
 		confidenceAlgorithmToFields(algo.Confidence, fields)
 	},
@@ -38,6 +41,16 @@ var algorithmFieldExporters = map[string]algorithmFieldExporter{
 	"prompt": func(algo *config.AlgorithmConfig, fields map[string]Value) {
 		promptAlgorithmToFields(algo.Prompt, fields)
 	},
+}
+
+func fallbackAlgorithmToFields(f *config.FallbackAlgorithmConfig, fields map[string]Value) {
+	if f == nil {
+		return
+	}
+	setIntValue(fields, "max_attempts", f.MaxAttempts)
+	if len(f.RetryOn) > 0 {
+		fields["retry_on"] = stringsToArray(f.RetryOn)
+	}
 }
 
 func promptAlgorithmToFields(

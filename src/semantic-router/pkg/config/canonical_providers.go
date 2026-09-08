@@ -38,6 +38,10 @@ type ProviderReliability struct {
 	HealthCheckPath     string `yaml:"health_check_path,omitempty"`
 	HealthCheckInterval string `yaml:"health_check_interval,omitempty"`
 	HealthCheckTimeout  string `yaml:"health_check_timeout,omitempty"`
+	// CircuitBreakerFailures opens the router-side model circuit after this
+	// many consecutive retryable failures. Zero disables runtime health gating.
+	CircuitBreakerFailures int    `yaml:"circuit_breaker_failures,omitempty"`
+	CircuitBreakerOpenTime string `yaml:"circuit_breaker_open_time,omitempty"`
 }
 
 // CanonicalBackendRef defines one physical backend target for a provider model.

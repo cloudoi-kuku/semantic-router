@@ -79,6 +79,12 @@ is normalized, URL-validated, provenance tagged, marked untrusted, and injected
 as a tool result. Dry-run reports the plan and never evaluates caller authority
 or executes the search endpoint.
 
+The workflow union also accepts `type: mcp_tool_call` with an `mcp` payload.
+It names one HTTP server and one allowlisted tool, requires the discovered tool
+to advertise `readOnlyHint=true`, validates required arguments, accepts text
+results only, and enforces timeout, response-byte, and injected-character
+limits. Dry-run exposes the plan without network access or secret resolution.
+
 ## Routing and DSL boundary
 
 Routing owns:
@@ -90,6 +96,10 @@ Routing owns:
 - route-local output and adaptation policy.
 
 Algorithms may declare `minimum_candidates` as a portable Recipe contract.
+The `fallback` Looper algorithm also declares `max_attempts` and retryable
+failure classes. Provider `reliability` owns runtime circuit thresholds and
+open duration, while the decision request budget owns the cumulative
+worst-case cost ceiling across Envoy retries and fallback attempts.
 Model-free assets can carry the declaration with empty `modelRefs`; a concrete
 Entrypoint binding must satisfy it, and request-time eligibility filters must
 preserve it before selection or multi-model execution begins.

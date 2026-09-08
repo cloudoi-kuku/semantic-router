@@ -33,6 +33,8 @@ func (r *OpenAIRouter) handleLooperResponseHeaders(
 	if v != nil && v.ResponseHeaders != nil && v.ResponseHeaders.Headers != nil {
 		statusCode = getStatusFromHeaders(v.ResponseHeaders.Headers)
 	}
+	ctx.UpstreamStatusCode = statusCode
+	r.observeProviderHealth(ctx, statusCode)
 
 	r.updateRouterReplayStatus(ctx, statusCode, false)
 	return buildResponseHeadersContinueResponse(nil, false)
@@ -50,11 +52,27 @@ func evaluateResponseHeaderOutcome(
 	outcome.statusCode = getStatusFromHeaders(v.ResponseHeaders.Headers)
 	outcome.isSuccessful = outcome.statusCode >= 200 && outcome.statusCode < 300
 	if ctx != nil {
+		ctx.VSRProviderAttempts = responseAttemptCount(v.ResponseHeaders.Headers)
 		ctx.IsStreamingResponse = outcome.isSuccessful &&
 			(isStreamingContentType(v.ResponseHeaders.Headers) || isResponseAPIStreamRequest(ctx))
 	}
 	recordResponseHeaderErrorMetrics(ctx, outcome.statusCode)
 	return outcome
+}
+
+func responseAttemptCount(headerMap *core.HeaderMap) int {
+	if headerMap == nil {
+		return 1
+	}
+	for _, header := range headerMap.Headers {
+		if !strings.EqualFold(header.Key, "x-envoy-attempt-count") {
+			continue
+		}
+		if attempts, err := strconv.Atoi(extractHeaderValue(header)); err == nil && attempts > 0 {
+			return attempts
+		}
+	}
+	return 1
 }
 
 func recordResponseHeaderErrorMetrics(ctx *RequestContext, statusCode int) {

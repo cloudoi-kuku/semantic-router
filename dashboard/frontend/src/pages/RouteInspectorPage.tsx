@@ -196,9 +196,27 @@ const RouteInspectorPage: React.FC = () => {
                   {(result.cost.candidates || []).map((candidate) => (
                     <p className={styles.muted} key={`cost-${candidate.model}`}>
                       {candidate.model}: {candidate.estimated_cost?.toFixed(6) ?? 'unpriced'}{' '}
-                      {result.cost?.currency} ({candidate.status})
+                      {result.cost?.currency} ({candidate.status}; up to{' '}
+                      {candidate.max_provider_attempts || 1} provider attempt
+                      {(candidate.max_provider_attempts || 1) === 1 ? '' : 's'})
                     </p>
                   ))}
+                </div>
+              ) : null}
+
+              {result.resilience ? (
+                <div className={styles.signalSection}>
+                  <h3>Planned resilience</h3>
+                  <p className={styles.muted}>{result.resilience.contract_version}</p>
+                  <p>
+                    Ordered chain:{' '}
+                    {(result.resilience.candidate_models || []).join(' → ') || 'none'}
+                  </p>
+                  <p className={styles.muted}>
+                    At most {result.resilience.max_attempts} model attempts; advances on{' '}
+                    {result.resilience.retry_on.join(', ')}. Dry-run model execution:{' '}
+                    {result.resilience.executes_models ? 'yes' : 'no'}.
+                  </p>
                 </div>
               ) : null}
 
@@ -207,8 +225,11 @@ const RouteInspectorPage: React.FC = () => {
                   <h3>Planned workflow</h3>
                   <p className={styles.muted}>{result.workflow.contract_version}</p>
                   <p>
-                    {result.workflow.type} via {result.workflow.tool.provider}; synthesis model{' '}
-                    {result.workflow.synthesis_model || 'not selected'}
+                    {result.workflow.type} via{' '}
+                    {result.workflow.tool.type === 'mcp'
+                      ? `${result.workflow.tool.server_name}.${result.workflow.tool.tool_name} (read-only required)`
+                      : result.workflow.tool.provider}
+                    ; synthesis model {result.workflow.synthesis_model || 'not selected'}
                   </p>
                   <p className={styles.muted}>
                     Authorization: {result.workflow.authorization.status}; required group{' '}
@@ -216,10 +237,16 @@ const RouteInspectorPage: React.FC = () => {
                     {result.workflow.executes_tools ? 'yes' : 'no'}.
                   </p>
                   <p className={styles.muted}>
-                    Bounds: {result.workflow.tool.max_results} results,{' '}
+                    Bounds:{' '}
+                    {result.workflow.tool.type === 'web_search'
+                      ? `${result.workflow.tool.max_results} results, `
+                      : ''}
                     {result.workflow.tool.timeout_seconds}s timeout,{' '}
                     {result.workflow.tool.max_response_bytes} response bytes,{' '}
-                    {result.workflow.tool.max_evidence_characters} evidence characters.
+                    {result.workflow.tool.type === 'mcp'
+                      ? result.workflow.tool.max_result_characters
+                      : result.workflow.tool.max_evidence_characters}{' '}
+                    injected characters.
                   </p>
                 </div>
               ) : null}

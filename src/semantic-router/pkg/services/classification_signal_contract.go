@@ -118,13 +118,42 @@ func (s *ClassificationService) populateEvalModelSelection(
 		decisionResult.Decision.Workflow,
 		response.SelectedModel,
 	)
+	response.Resilience = resilienceEvaluation(decisionResult.Decision, selection.Eligibility)
+}
+
+func resilienceEvaluation(
+	decision *config.Decision,
+	eligibility *ModelEligibility,
+) *ResilienceEvaluation {
+	if decision == nil || decision.Algorithm == nil ||
+		decision.Algorithm.Type != config.DecisionAlgorithmFallback ||
+		decision.Algorithm.Fallback == nil {
+		return nil
+	}
+	retryOn := append([]string(nil), decision.Algorithm.Fallback.RetryOn...)
+	if len(retryOn) == 0 {
+		retryOn = append([]string(nil), config.DefaultFallbackRetryOn...)
+	}
+	models := []string(nil)
+	if eligibility != nil {
+		models = append(models, eligibility.EligibleModels...)
+	}
+	return &ResilienceEvaluation{
+		ContractVersion: config.ResilienceContractVersion,
+		Type:            "ordered_fallback",
+		Status:          "planned",
+		MaxAttempts:     decision.Algorithm.Fallback.MaxAttempts,
+		RetryOn:         retryOn,
+		CandidateModels: models,
+		ExecutesModels:  false,
+	}
 }
 
 func workflowEvaluation(workflow *config.WorkflowConfig, synthesisModel string) *WorkflowEvaluation {
-	if workflow == nil || workflow.WebSearch == nil {
+	if workflow == nil {
 		return nil
 	}
-	return &WorkflowEvaluation{
+	evaluation := &WorkflowEvaluation{
 		ContractVersion: config.WorkflowContractVersion,
 		Type:            workflow.Type,
 		Status:          "planned",
@@ -132,17 +161,27 @@ func workflowEvaluation(workflow *config.WorkflowConfig, synthesisModel string) 
 			RequiredGroup: workflow.AuthorizationGroup,
 			Status:        "not_evaluated",
 		},
-		Tool: WorkflowToolPlan{
+		SynthesisModel: synthesisModel,
+		ExecutesTools:  false,
+	}
+	if workflow.WebSearch != nil {
+		evaluation.Tool = WorkflowToolPlan{
 			Type:                  "web_search",
 			Provider:              workflow.WebSearch.Provider,
 			MaxResults:            workflow.WebSearch.MaxResults,
 			TimeoutSeconds:        workflow.WebSearch.TimeoutSeconds,
 			MaxResponseBytes:      workflow.WebSearch.MaxResponseBytes,
 			MaxEvidenceCharacters: workflow.WebSearch.MaxEvidenceCharacters,
-		},
-		SynthesisModel: synthesisModel,
-		ExecutesTools:  false,
+		}
 	}
+	if workflow.MCP != nil {
+		evaluation.Tool = WorkflowToolPlan{
+			Type: "mcp", ServerName: workflow.MCP.ServerName, ToolName: workflow.MCP.ToolName,
+			TimeoutSeconds: workflow.MCP.TimeoutSeconds, MaxResponseBytes: workflow.MCP.MaxResponseBytes,
+			MaxResultCharacters: workflow.MCP.MaxResultCharacters, RequiresReadOnly: workflow.MCP.RequireReadOnly,
+		}
+	}
+	return evaluation
 }
 
 func intentTokenBound(values ...json.RawMessage) int {

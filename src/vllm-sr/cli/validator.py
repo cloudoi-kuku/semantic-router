@@ -79,6 +79,7 @@ def _iter_profile_decisions(config: UserConfig):
 
 VALID_ALGORITHM_TYPES = {
     "confidence",
+    "fallback",
     "ratings",
     "remom",
     "fusion",
@@ -605,7 +606,7 @@ def validate_algorithm_configurations(config: UserConfig) -> List[ValidationErro
     """
     Validate algorithm configurations in decisions.
 
-    Validates both looper algorithms (confidence, ratings, remom, fusion,
+    Validates both looper algorithms (confidence, fallback, ratings, remom, fusion,
     workflows)
     and selection algorithms (static, router_dc, automix, hybrid,
     knn, kmeans, svm, mlp, multi_factor, latency_aware, prompt).
@@ -639,6 +640,20 @@ def validate_algorithm_configurations(config: UserConfig) -> List[ValidationErro
         errors.extend(_router_dc_missing_description_errors(decision, algo, config))
         errors.extend(_algorithm_quorum_errors(decision, algo, field_prefix))
         errors.extend(_workflow_configuration_errors(decision, algo, field_prefix))
+
+        fallback_cfg = getattr(algo, "fallback", None)
+        if (
+            algo_type == "fallback"
+            and fallback_cfg is not None
+            and fallback_cfg.max_attempts > len(decision.modelRefs)
+        ):
+            errors.append(
+                ValidationError(
+                    f"Decision '{decision.name}' fallback max_attempts exceeds its "
+                    f"{len(decision.modelRefs)} modelRefs",
+                    field=f"{field_prefix}.{decision.name}.algorithm.fallback.max_attempts",
+                )
+            )
 
         hybrid_err = _maybe_hybrid_weight_error(
             decision.name,

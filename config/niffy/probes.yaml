@@ -64,6 +64,11 @@ decisions:
           - role: user
             content: Browse the web and give me up-to-date details.
         tags: [multi_turn, shape:messages, tools:web]
+      - id: semantic_freshness
+        query: What changed in the Kubernetes release announced this week?
+        expected_signals:
+          embeddings: [live_information_task]
+        tags: [semantic, classifier, tools:web]
 
   - id: reasoning-route
     expected_decision: reasoning-route
@@ -90,10 +95,15 @@ decisions:
       - id: reasoning_without_search
         query: Create an implementation plan for migrating this monolith without external research.
         tags: [negative, boundary]
+      - id: semantic_reasoning_demand
+        query: Assess three competing consistency strategies under partitions, recovery, and regional latency constraints, then justify the safest choice.
+        expected_signals:
+          complexity: [reasoning_demand:hard]
+        tags: [semantic, classifier, robustness]
 
   - id: economical-default-route
     expected_decision: economical-default-route
-    expected_algorithm: static
+    expected_algorithm: fallback
     expected_alias: niffy-cheap
     forbidden_signals:
       keywords: [tool_intent, reasoning_intent]

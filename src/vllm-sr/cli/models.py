@@ -1605,9 +1605,60 @@ class WorkflowConfig(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    type: Literal["web_search_answer"]
+    type: Literal["web_search_answer", "mcp_tool_call"]
     authorization_group: str = Field(min_length=1)
-    web_search: WebSearchWorkflow
+    web_search: Optional[WebSearchWorkflow] = None
+    mcp: Optional["MCPWorkflow"] = None
+
+    @model_validator(mode="after")
+    def validate_matching_payload(self):
+        if self.type == "web_search_answer" and (
+            self.web_search is None or self.mcp is not None
+        ):
+            raise ValueError("web_search_answer must define only web_search")
+        if self.type == "mcp_tool_call" and (
+            self.mcp is None or self.web_search is not None
+        ):
+            raise ValueError("mcp_tool_call must define only mcp")
+        return self
+
+
+class MCPWorkflow(BaseModel):
+    """One bounded, allowlisted, read-only MCP tool call over HTTP."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    server_name: str = Field(min_length=1)
+    endpoint: str
+    tool_name: str = Field(min_length=1)
+    arguments: Dict[str, Any] = Field(default_factory=dict)
+    api_key_env: Optional[str] = Field(default=None, pattern=r"^[A-Z][A-Z0-9_]*$")
+    api_key_header: Optional[str] = None
+    timeout_seconds: int = Field(ge=1, le=30)
+    max_response_bytes: int = Field(ge=1024, le=4 * 1024 * 1024)
+    max_result_characters: int = Field(ge=128, le=20000)
+    require_read_only: Literal[True]
+
+    @model_validator(mode="after")
+    def validate_endpoint_and_secret_header(self):
+        endpoint = self.endpoint
+        reference = re.fullmatch(r"\$\{[A-Z][A-Z0-9_]*(?::-(.+))?\}", endpoint)
+        if reference and reference.group(1):
+            endpoint = reference.group(1)
+        parsed = urlparse(endpoint)
+        if not reference and (
+            parsed.scheme not in ("http", "https") or not parsed.netloc
+        ):
+            raise ValueError("endpoint must be an absolute HTTP(S) URL")
+        if (
+            reference
+            and reference.group(1)
+            and (parsed.scheme not in ("http", "https") or not parsed.netloc)
+        ):
+            raise ValueError("endpoint must be an absolute HTTP(S) URL")
+        if self.api_key_env and not (self.api_key_header or "").strip():
+            raise ValueError("api_key_header is required when api_key_env is set")
+        return self
 
 
 class Decision(BaseModel):
@@ -1739,6 +1790,8 @@ class ProviderReliability(BaseModel):
     health_check_path: Optional[str] = None
     health_check_interval: str = "10s"
     health_check_timeout: str = "2s"
+    circuit_breaker_failures: int = Field(default=0, ge=0, le=100)
+    circuit_breaker_open_time: str | None = None
 
 
 class Model(BaseModel):

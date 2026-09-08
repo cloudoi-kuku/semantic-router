@@ -632,6 +632,31 @@ routing:
             gte: 0.45
 
   decisions:
+    - name: resilient_provider_fallback_reference
+      description: Ordered, budget-bounded provider fallback reference.
+      priority: 206
+      required_capabilities: [chat]
+      request_budget:
+        currency: USD
+        max_estimated_cost: 0.25
+        output_token_bound: 1024
+      rules:
+        operator: AND
+        conditions:
+          - type: keyword
+            name: urgent_keywords
+      modelRefs:
+        - model: qwen3-8b
+          use_reasoning: false
+        - model: qwen3-32b
+          use_reasoning: true
+      algorithm:
+        type: fallback
+        minimum_candidates: 2
+        fallback:
+          max_attempts: 2
+          retry_on: [transport_error, timeout, rate_limited, server_error, invalid_response]
+
     - name: authorized_web_search_reference_route
       description: Reference contract for an authenticated, bounded SearXNG evidence workflow.
       priority: 205

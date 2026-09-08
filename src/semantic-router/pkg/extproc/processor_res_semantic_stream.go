@@ -390,6 +390,7 @@ func (r *OpenAIRouter) finalizeSemanticStreamingResponse(ctx *RequestContext, st
 	r.updateResponseCache(ctx, encoded)
 	r.scheduleSemanticResponseMemoryStore(ctx, semanticResponse)
 	r.persistResponseObject(ctx)
+	r.recordExecutionEvidence(ctx, completionLatency)
 	r.attachRouterReplayResponse(ctx, encoded, true)
 }
 

@@ -33,17 +33,7 @@ func (c *Compiler) compileRoute(r *RouteDecl) config.Decision {
 		}
 	}
 	if r.Workflow != nil {
-		decision.Workflow = &config.WorkflowConfig{
-			Type: r.Workflow.Type, AuthorizationGroup: r.Workflow.AuthorizationGroup,
-			WebSearch: &config.WebSearchWorkflowConfig{
-				Provider: r.Workflow.Provider, Endpoint: r.Workflow.Endpoint,
-				APIKeyEnv: r.Workflow.APIKeyEnv, APIKeyHeader: r.Workflow.APIKeyHeader,
-				TimeoutSeconds: r.Workflow.TimeoutSeconds, MaxResults: r.Workflow.MaxResults,
-				MaxQueryCharacters:    r.Workflow.MaxQueryCharacters,
-				MaxResponseBytes:      int64(r.Workflow.MaxResponseBytes),
-				MaxEvidenceCharacters: r.Workflow.MaxEvidenceCharacters,
-			},
-		}
+		decision.Workflow = compileDecisionWorkflow(r.Workflow)
 	}
 	if r.Action != nil {
 		decision.Action = &config.DecisionAction{
@@ -78,6 +68,27 @@ func (c *Compiler) compileRoute(r *RouteDecl) config.Decision {
 
 	c.compileRouteEmits(r, &decision)
 	return decision
+}
+
+func compileDecisionWorkflow(workflow *WorkflowDecl) *config.WorkflowConfig {
+	result := &config.WorkflowConfig{Type: workflow.Type, AuthorizationGroup: workflow.AuthorizationGroup}
+	if workflow.Type == config.WorkflowWebSearchAnswer {
+		result.WebSearch = &config.WebSearchWorkflowConfig{
+			Provider: workflow.Provider, Endpoint: workflow.Endpoint, APIKeyEnv: workflow.APIKeyEnv,
+			APIKeyHeader: workflow.APIKeyHeader, TimeoutSeconds: workflow.TimeoutSeconds, MaxResults: workflow.MaxResults,
+			MaxQueryCharacters: workflow.MaxQueryCharacters, MaxResponseBytes: int64(workflow.MaxResponseBytes),
+			MaxEvidenceCharacters: workflow.MaxEvidenceCharacters,
+		}
+	}
+	if workflow.Type == config.WorkflowMCPToolCall {
+		result.MCP = &config.MCPWorkflowConfig{
+			ServerName: workflow.ServerName, Endpoint: workflow.Endpoint, ToolName: workflow.ToolName,
+			Arguments: workflow.Arguments, APIKeyEnv: workflow.APIKeyEnv, APIKeyHeader: workflow.APIKeyHeader,
+			TimeoutSeconds: workflow.TimeoutSeconds, MaxResponseBytes: int64(workflow.MaxResponseBytes),
+			MaxResultCharacters: workflow.MaxResultCharacters, RequireReadOnly: workflow.RequireReadOnly,
+		}
+	}
+	return result
 }
 
 func (c *Compiler) compileRouteRules(r *RouteDecl) config.RuleCombination {

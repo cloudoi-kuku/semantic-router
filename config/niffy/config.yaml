@@ -9,6 +9,19 @@ listeners:
     timeout: 300s
 
 global:
+  services:
+    router_replay:
+      enabled: true
+      store_backend: memory
+      ttl_seconds: 604800
+      async_writes: false
+  model_catalog:
+    embeddings:
+      semantic:
+        embedding_config:
+          # Niffy uses per-signal calibrated thresholds and does not accept a
+          # lower global soft-match fallback.
+          enable_soft_matching: false
   router:
     auto_model_names:
       - niffy/auto
@@ -38,6 +51,11 @@ providers:
         prompt_per_1m: 0.15
         cached_input_per_1m: 0.015
         completion_per_1m: 0.60
+      reliability:
+        retry_count: 1
+        retry_on: connect-failure,refused-stream,reset
+        circuit_breaker_failures: 3
+        circuit_breaker_open_time: 30s
       backend_refs:
         - name: mistral
           base_url: https://api.mistral.ai/v1
@@ -62,6 +80,11 @@ providers:
         prompt_per_1m: 1.25
         cached_input_per_1m: 0.20
         completion_per_1m: 2.50
+      reliability:
+        retry_count: 1
+        retry_on: connect-failure,refused-stream,reset
+        circuit_breaker_failures: 3
+        circuit_breaker_open_time: 30s
       backend_refs:
         - name: xai
           base_url: https://api.x.ai/v1
@@ -87,6 +110,11 @@ providers:
         prompt_per_1m: 2.00
         cached_input_per_1m: 0.20
         completion_per_1m: 12.00
+      reliability:
+        retry_count: 1
+        retry_on: connect-failure,refused-stream,reset
+        circuit_breaker_failures: 3
+        circuit_breaker_open_time: 30s
       backend_refs:
         - name: openai
           base_url: https://api.openai.com/v1
@@ -118,6 +146,33 @@ routing:
       tags: [provider:openai, tier:reasoning]
 
   signals:
+    embeddings:
+      - name: live_information_task
+        threshold: 0.56
+        aggregation_method: max
+        candidates:
+          - retrieve recent information from the internet before answering
+          - verify a current claim using live external sources
+          - find today's status, price, schedule, or breaking news
+          - look up information that may have changed recently
+
+    complexity:
+      - name: reasoning_demand
+        threshold: 0.10
+        description: Calibrated local prototype margin for deliberate reasoning demand.
+        hard:
+          candidates:
+            - compare multiple approaches and justify the tradeoffs
+            - diagnose a complex failure from several interacting causes
+            - derive a result step by step from first principles
+            - synthesize constraints into an implementation architecture
+        easy:
+          candidates:
+            - give a short direct factual answer
+            - rewrite or translate one sentence
+            - summarize a short paragraph briefly
+            - provide a simple definition
+
     keywords:
       - name: tool_intent
         operator: OR
@@ -184,15 +239,24 @@ routing:
           max_response_bytes: 262144
           max_evidence_characters: 8000
       rules:
-        operator: AND
+        operator: OR
         conditions:
           - type: keyword
             name: tool_intent
+          - type: embedding
+            name: live_information_task
       modelRefs:
         - model: niffy-general
           use_reasoning: false
       algorithm:
         type: static
+      plugins:
+        - type: router_replay
+          configuration:
+            enabled: true
+            max_records: 1000
+            capture_request_body: false
+            capture_response_body: false
 
     - name: reasoning-route
       description: Select OpenAI for requests likely to need deliberate reasoning.
@@ -200,22 +264,31 @@ routing:
       required_capabilities: [chat, reasoning]
       request_budget:
         currency: USD
-        max_estimated_cost: 0.12
+        max_estimated_cost: 0.25
         output_token_bound: 4096
         reasoning_token_bound: 4096
         require_pricing: true
         require_current_pricing: true
       rules:
-        operator: AND
+        operator: OR
         conditions:
           - type: keyword
             name: reasoning_intent
+          - type: complexity
+            name: reasoning_demand:hard
       modelRefs:
         - model: niffy-reasoning
           use_reasoning: true
           reasoning_effort: medium
       algorithm:
         type: static
+      plugins:
+        - type: router_replay
+          configuration:
+            enabled: true
+            max_records: 1000
+            capture_request_body: false
+            capture_response_body: false
 
     - name: economical-default-route
       description: Select Mistral for all requests not matched by a more specific route.
@@ -223,7 +296,7 @@ routing:
       required_capabilities: [chat]
       request_budget:
         currency: USD
-        max_estimated_cost: 0.005
+        max_estimated_cost: 0.01
         output_token_bound: 1024
         require_pricing: true
         require_current_pricing: true
@@ -233,5 +306,18 @@ routing:
       modelRefs:
         - model: niffy-cheap
           use_reasoning: false
+        - model: niffy-general
+          use_reasoning: false
       algorithm:
-        type: static
+        type: fallback
+        minimum_candidates: 2
+        fallback:
+          max_attempts: 2
+          retry_on: [transport_error, timeout, rate_limited, server_error, invalid_response]
+      plugins:
+        - type: router_replay
+          configuration:
+            enabled: true
+            max_records: 1000
+            capture_request_body: false
+            capture_response_body: false

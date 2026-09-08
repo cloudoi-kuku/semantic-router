@@ -23,6 +23,7 @@ func (r *OpenAIRouter) handleResponseHeaders(v *ext_proc.ProcessingRequest_Respo
 	maybeRecordResponseHeaderTTFT(ctx)
 	r.updateRouterReplayStatus(ctx, outcome.statusCode, ctx != nil && ctx.IsStreamingResponse)
 	r.observeRouterLearningProviderStatus(ctx, outcome.statusCode)
+	r.observeProviderHealth(ctx, outcome.statusCode)
 
 	headerMutation := buildResponseHeaderMutation(ctx, outcome.isSuccessful)
 	headerMutation = mergeHeaderMutations(headerMutation, buildResponseStreamingMutation(ctx, outcome))

@@ -1,0 +1,11 @@
+algorithm:
+  type: fallback
+  minimum_candidates: 2
+  fallback:
+    max_attempts: 2
+    retry_on:
+      - transport_error
+      - timeout
+      - rate_limited
+      - server_error
+      - invalid_response

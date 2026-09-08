@@ -116,6 +116,10 @@ type Response struct {
 	// so it reflects real elapsed time regardless of whether the algorithm
 	// dispatches its model calls sequentially or concurrently.
 	LatencyMs int64 `json:"latency_ms,omitempty"`
+
+	// ProviderAttempts is the total same-model transport attempts across the
+	// model calls represented by this response.
+	ProviderAttempts int `json:"provider_attempts,omitempty"`
 }
 
 // Looper defines the interface for multi-model execution strategies
@@ -137,6 +141,9 @@ func (e *UnsupportedAlgorithmError) Error() string {
 type algorithmConstructor func(*config.LooperConfig) Looper
 
 var algorithmConstructors = map[string]algorithmConstructor{
+	config.DecisionAlgorithmFallback: func(cfg *config.LooperConfig) Looper {
+		return NewFallbackLooper(cfg)
+	},
 	config.DecisionAlgorithmConfidence: func(cfg *config.LooperConfig) Looper {
 		return NewConfidenceLooper(cfg)
 	},

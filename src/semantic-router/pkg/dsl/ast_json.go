@@ -140,17 +140,22 @@ type RequestBudgetDeclJSON struct {
 }
 
 type WorkflowDeclJSON struct {
-	Type                  string `json:"type"`
-	AuthorizationGroup    string `json:"authorizationGroup"`
-	Provider              string `json:"provider"`
-	Endpoint              string `json:"endpoint"`
-	APIKeyEnv             string `json:"apiKeyEnv,omitempty"`
-	APIKeyHeader          string `json:"apiKeyHeader,omitempty"`
-	TimeoutSeconds        int    `json:"timeoutSeconds"`
-	MaxResults            int    `json:"maxResults"`
-	MaxQueryCharacters    int    `json:"maxQueryCharacters"`
-	MaxResponseBytes      int    `json:"maxResponseBytes"`
-	MaxEvidenceCharacters int    `json:"maxEvidenceCharacters"`
+	Type                  string                 `json:"type"`
+	AuthorizationGroup    string                 `json:"authorizationGroup"`
+	Provider              string                 `json:"provider"`
+	Endpoint              string                 `json:"endpoint"`
+	APIKeyEnv             string                 `json:"apiKeyEnv,omitempty"`
+	APIKeyHeader          string                 `json:"apiKeyHeader,omitempty"`
+	TimeoutSeconds        int                    `json:"timeoutSeconds"`
+	MaxResults            int                    `json:"maxResults"`
+	MaxQueryCharacters    int                    `json:"maxQueryCharacters"`
+	MaxResponseBytes      int                    `json:"maxResponseBytes"`
+	MaxEvidenceCharacters int                    `json:"maxEvidenceCharacters"`
+	ServerName            string                 `json:"serverName,omitempty"`
+	ToolName              string                 `json:"toolName,omitempty"`
+	Arguments             map[string]interface{} `json:"arguments,omitempty"`
+	MaxResultCharacters   int                    `json:"maxResultCharacters,omitempty"`
+	RequireReadOnly       bool                   `json:"requireReadOnly,omitempty"`
 }
 
 // EmitDeclJSON is the JSON form of an EMIT directive on a route.
@@ -445,6 +450,8 @@ func routeDeclToJSON(r *RouteDecl) *RouteDeclJSON {
 			TimeoutSeconds: r.Workflow.TimeoutSeconds, MaxResults: r.Workflow.MaxResults,
 			MaxQueryCharacters: r.Workflow.MaxQueryCharacters, MaxResponseBytes: r.Workflow.MaxResponseBytes,
 			MaxEvidenceCharacters: r.Workflow.MaxEvidenceCharacters,
+			ServerName:            r.Workflow.ServerName, ToolName: r.Workflow.ToolName, Arguments: r.Workflow.Arguments,
+			MaxResultCharacters: r.Workflow.MaxResultCharacters, RequireReadOnly: r.Workflow.RequireReadOnly,
 		}
 	}
 	for _, m := range r.Models {

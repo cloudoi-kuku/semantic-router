@@ -46,6 +46,47 @@ func TestRequestBudgetFailsClosedForStalePricing(t *testing.T) {
 	}
 }
 
+func TestRequestBudgetAccountsForEnvoyRetries(t *testing.T) {
+	router := &OpenAIRouter{Config: &config.RouterConfig{BackendModels: config.BackendModels{
+		ModelConfig: map[string]config.ModelParams{
+			"retrying": {Pricing: currentTestPricing(1, 2), Reliability: config.ProviderReliability{RetryCount: 2}},
+		},
+	}}}
+	result := router.requestBudgetEligibleModelRefs(
+		[]config.ModelRef{{Model: "retrying"}},
+		&config.RequestBudget{Currency: "USD", MaxEstimatedCost: 0.01, OutputTokenBound: 1000, RequirePricing: true},
+		1000, 0, 0, time.Date(2026, 9, 3, 0, 0, 0, 0, time.UTC),
+	)
+	estimate := result.evaluation.Candidates[0]
+	if estimate.MaxProviderAttempts != 3 || estimate.EstimatedCost != estimate.SingleAttemptEstimatedCost*3 {
+		t.Fatalf("retry estimate = %#v, want three provider attempts", estimate)
+	}
+}
+
+func TestFallbackChainStopsBeforeCumulativeBudgetIsExceeded(t *testing.T) {
+	router := &OpenAIRouter{Config: &config.RouterConfig{BackendModels: config.BackendModels{
+		ModelConfig: map[string]config.ModelParams{
+			"cheap": {Pricing: currentTestPricing(1, 2)},
+			"next":  {Pricing: currentTestPricing(1, 2)},
+		},
+	}}}
+	decision := &config.Decision{
+		RequestBudget: &config.RequestBudget{Currency: "USD", MaxEstimatedCost: 0.004, OutputTokenBound: 1000, RequirePricing: true},
+		Algorithm:     &config.AlgorithmConfig{Type: config.DecisionAlgorithmFallback, Fallback: &config.FallbackAlgorithmConfig{MaxAttempts: 2}},
+	}
+	result := router.requestBudgetEligibleModelRefs(
+		[]config.ModelRef{{Model: "cheap"}, {Model: "next"}}, decision.RequestBudget,
+		1000, 0, 0, time.Date(2026, 9, 3, 0, 0, 0, 0, time.UTC),
+	)
+	result = router.boundFallbackChain(result, decision)
+	if len(result.eligible) != 1 || result.eligible[0].Model != "cheap" {
+		t.Fatalf("bounded chain = %#v, want cheap only", result.eligible)
+	}
+	if result.evaluation.Candidates[1].Status != "fallback_chain_budget_exceeded" {
+		t.Fatalf("second candidate status = %q", result.evaluation.Candidates[1].Status)
+	}
+}
+
 func currentTestPricing(input, output float64) config.ModelPricing {
 	return config.ModelPricing{
 		Version: "test-v1", Source: "test-catalog", Unit: config.PricingUnitPerMillionTokens,

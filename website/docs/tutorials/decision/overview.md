@@ -90,6 +90,13 @@ form is `WORKFLOW { type: "web_search_answer", ... }`. The route-evaluation API
 shows the planned workflow with `executes_tools: false`; it never performs the
 search during inspection.
 
+`mcp_tool_call` uses the same trusted-group boundary for one configured HTTP
+MCP server and tool. Discovery must return the exact tool with
+`readOnlyHint=true`; destructive or non-text results fail closed. Arguments
+may contain request substitutions such as `{{user_content}}`. The
+dry-run response names the server and tool but does not resolve credentials,
+discover capabilities, or execute the call.
+
 Choose the smallest shape that expresses the policy clearly:
 
 | Decision shape | Best for | Guide |

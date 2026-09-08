@@ -5,6 +5,7 @@ import "sort"
 const (
 	DecisionAlgorithmAutoMix      = "automix"
 	DecisionAlgorithmConfidence   = "confidence"
+	DecisionAlgorithmFallback     = "fallback"
 	DecisionAlgorithmFusion       = "fusion"
 	DecisionAlgorithmHybrid       = "hybrid"
 	DecisionAlgorithmKMeans       = "kmeans"
@@ -96,6 +97,7 @@ type AlgorithmCatalogEntry struct {
 var decisionAlgorithmCatalog = []AlgorithmCatalogEntry{
 	{Type: DecisionAlgorithmAutoMix, Tier: "experimental", Execution: AlgorithmExecutionSelector},
 	{Type: DecisionAlgorithmConfidence, Tier: "supported", Execution: AlgorithmExecutionLooper},
+	{Type: DecisionAlgorithmFallback, Tier: "supported", Execution: AlgorithmExecutionLooper},
 	{Type: DecisionAlgorithmFusion, Tier: "experimental", Execution: AlgorithmExecutionLooper},
 	{Type: DecisionAlgorithmHybrid, Tier: "supported", Execution: AlgorithmExecutionSelector},
 	{Type: DecisionAlgorithmKMeans, Tier: "experimental", Execution: AlgorithmExecutionSelector},

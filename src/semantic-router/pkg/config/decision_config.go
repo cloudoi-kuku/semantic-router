@@ -32,6 +32,7 @@ const DecisionActionRoute = "route"
 const (
 	WorkflowContractVersion  = "vllm-sr/workflow/v1alpha1"
 	WorkflowWebSearchAnswer  = "web_search_answer"
+	WorkflowMCPToolCall      = "mcp_tool_call"
 	WebSearchProviderSearXNG = "searxng"
 )
 
@@ -73,11 +74,28 @@ type Decision struct {
 }
 
 // WorkflowConfig selects an authorized, bounded execution path before model
-// synthesis. The initial contract supports public web-search evidence only.
+// synthesis. Each type has exactly one matching provider payload.
 type WorkflowConfig struct {
 	Type               string                   `yaml:"type" json:"type"`
 	AuthorizationGroup string                   `yaml:"authorization_group" json:"authorization_group"`
 	WebSearch          *WebSearchWorkflowConfig `yaml:"web_search,omitempty" json:"web_search,omitempty"`
+	MCP                *MCPWorkflowConfig       `yaml:"mcp,omitempty" json:"mcp,omitempty"`
+}
+
+// MCPWorkflowConfig defines one allowlisted, read-only MCP tool call over
+// streamable HTTP. Arguments are static values with {{user_content}}
+// substitution; secret values are resolved from APIKeyEnv only after authz.
+type MCPWorkflowConfig struct {
+	ServerName          string                 `yaml:"server_name" json:"server_name"`
+	Endpoint            string                 `yaml:"endpoint" json:"endpoint"`
+	ToolName            string                 `yaml:"tool_name" json:"tool_name"`
+	Arguments           map[string]interface{} `yaml:"arguments,omitempty" json:"arguments,omitempty"`
+	APIKeyEnv           string                 `yaml:"api_key_env,omitempty" json:"api_key_env,omitempty"`
+	APIKeyHeader        string                 `yaml:"api_key_header,omitempty" json:"api_key_header,omitempty"`
+	TimeoutSeconds      int                    `yaml:"timeout_seconds" json:"timeout_seconds"`
+	MaxResponseBytes    int64                  `yaml:"max_response_bytes" json:"max_response_bytes"`
+	MaxResultCharacters int                    `yaml:"max_result_characters" json:"max_result_characters"`
+	RequireReadOnly     bool                   `yaml:"require_read_only" json:"require_read_only"`
 }
 
 // WebSearchWorkflowConfig defines the provider adapter and hard execution
@@ -151,6 +169,7 @@ type CandidateIterationOutputConfig struct {
 type AlgorithmConfig struct {
 	Type              string                       `yaml:"type"`
 	MinimumCandidates int                          `yaml:"minimum_candidates,omitempty"`
+	Fallback          *FallbackAlgorithmConfig     `yaml:"fallback,omitempty"`
 	Confidence        *ConfidenceAlgorithmConfig   `yaml:"confidence,omitempty"`
 	Ratings           *RatingsAlgorithmConfig      `yaml:"ratings,omitempty"`
 	ReMoM             *ReMoMAlgorithmConfig        `yaml:"remom,omitempty"`
@@ -167,6 +186,14 @@ type AlgorithmConfig struct {
 	Prompt            *PromptSelectionConfig       `yaml:"prompt,omitempty"`
 	SessionAware      *SessionAwareSelectionConfig `yaml:"-"`
 	OnError           string                       `yaml:"on_error,omitempty"`
+}
+
+// FallbackAlgorithmConfig executes modelRefs in declared order until one
+// succeeds. MaxAttempts is a hard provider-call bound; RetryOn controls which
+// failure classes may advance to the next provider.
+type FallbackAlgorithmConfig struct {
+	MaxAttempts int      `yaml:"max_attempts" json:"max_attempts"`
+	RetryOn     []string `yaml:"retry_on,omitempty" json:"retry_on,omitempty"`
 }
 
 // PromptSelectionConfig configures deterministic, prompt-driven selection

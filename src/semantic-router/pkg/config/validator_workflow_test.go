@@ -37,6 +37,42 @@ func TestValidateWorkflowContractsRejectsInvalidCredentialHeader(t *testing.T) {
 	}
 }
 
+func TestValidateWorkflowContractsAcceptsBoundedReadOnlyMCPWorkflow(t *testing.T) {
+	cfg := workflowValidationConfig()
+	cfg.Decisions[0].Workflow = testMCPWorkflowConfig()
+	if err := validateWorkflowContracts(cfg); err != nil {
+		t.Fatalf("validate MCP workflow: %v", err)
+	}
+}
+
+func TestValidateWorkflowContractsRejectsMCPWithoutReadOnlyGuard(t *testing.T) {
+	cfg := workflowValidationConfig()
+	cfg.Decisions[0].Workflow = testMCPWorkflowConfig()
+	cfg.Decisions[0].Workflow.MCP.RequireReadOnly = false
+	if err := validateWorkflowContracts(cfg); err == nil || !strings.Contains(err.Error(), "require_read_only") {
+		t.Fatalf("error = %v, want read-only guard failure", err)
+	}
+}
+
+func TestValidateWorkflowContractsRejectsMismatchedWorkflowPayload(t *testing.T) {
+	cfg := workflowValidationConfig()
+	cfg.Decisions[0].Workflow.MCP = testMCPWorkflowConfig().MCP
+	if err := validateWorkflowContracts(cfg); err == nil || !strings.Contains(err.Error(), "only web_search") {
+		t.Fatalf("error = %v, want tagged-union failure", err)
+	}
+}
+
+func testMCPWorkflowConfig() *WorkflowConfig {
+	return &WorkflowConfig{
+		Type: WorkflowMCPToolCall, AuthorizationGroup: "mcp-users",
+		MCP: &MCPWorkflowConfig{
+			ServerName: "catalog", Endpoint: "https://mcp.example.com", ToolName: "lookup",
+			Arguments: map[string]interface{}{"query": "${user_content}"}, TimeoutSeconds: 5,
+			MaxResponseBytes: 262144, MaxResultCharacters: 8000, RequireReadOnly: true,
+		},
+	}
+}
+
 func workflowValidationConfig() *RouterConfig {
 	return &RouterConfig{IntelligentRouting: IntelligentRouting{Decisions: []Decision{{
 		Name: "search",

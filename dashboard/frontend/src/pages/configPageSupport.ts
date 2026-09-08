@@ -125,6 +125,8 @@ export interface ProviderReliability {
   health_check_path?: string
   health_check_interval?: string
   health_check_timeout?: string
+  circuit_breaker_failures?: number
+  circuit_breaker_open_time?: string
 }
 
 export interface LoRAAdapter {
@@ -265,9 +267,23 @@ export interface RequestBudget {
 }
 
 export interface WorkflowConfig {
-  type: 'web_search_answer'
+  type: 'web_search_answer' | 'mcp_tool_call'
   authorization_group: string
-  web_search: WebSearchWorkflowConfig
+  web_search?: WebSearchWorkflowConfig
+  mcp?: MCPWorkflowConfig
+}
+
+export interface MCPWorkflowConfig {
+  server_name: string
+  endpoint: string
+  tool_name: string
+  arguments?: Record<string, unknown>
+  api_key_env?: string
+  api_key_header?: string
+  timeout_seconds: number
+  max_response_bytes: number
+  max_result_characters: number
+  require_read_only: true
 }
 
 export interface WebSearchWorkflowConfig {
@@ -1348,6 +1364,7 @@ export interface DecisionFormState {
   request_budget_require_pricing: boolean
   request_budget_require_current: boolean
   workflow_enabled: boolean
+  workflow_type: 'web_search_answer' | 'mcp_tool_call'
   workflow_authorization_group: string
   workflow_endpoint: string
   workflow_api_key_env: string
@@ -1357,6 +1374,10 @@ export interface DecisionFormState {
   workflow_max_query_characters: number
   workflow_max_response_bytes: number
   workflow_max_evidence_characters: number
+  workflow_mcp_server_name: string
+  workflow_mcp_tool_name: string
+  workflow_mcp_arguments: string
+  workflow_max_result_characters: number
   modelRefs: DecisionModelRef[]
   plugins: { type: string; configuration: string | DecisionPluginConfiguration }[]
 }

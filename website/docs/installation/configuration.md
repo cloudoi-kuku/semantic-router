@@ -130,6 +130,7 @@ build regenerates this block and fails if the checked-in catalog has drifted.
 | Family and type | Use it to | Reusable fragment | Guide |
 | --- | --- | --- | --- |
 | `confidence` — looper algorithm | `confidence` tries candidate models in order and stops when response confidence reaches a configured threshold. | [`config/fragments/algorithm/looper/confidence.yaml`](https://github.com/vllm-project/semantic-router/blob/main/config/fragments/algorithm/looper/confidence.yaml) | [Guide](../tutorials/algorithm/looper/confidence) |
+| `fallback` — looper algorithm | `fallback` tries provider models in declared order after explicitly retryable failures, with a hard attempt ceiling and cumulative request-budget enforcement. | [`config/fragments/algorithm/looper/fallback.yaml`](https://github.com/vllm-project/semantic-router/blob/main/config/fragments/algorithm/looper/fallback.yaml) | [Guide](../tutorials/algorithm/looper/fallback) |
 | `fusion` — looper algorithm | `fusion` asks several models to analyze a request and a judge model to synthesize one final answer. | [`config/fragments/algorithm/looper/fusion.yaml`](https://github.com/vllm-project/semantic-router/blob/main/config/fragments/algorithm/looper/fusion.yaml) | [Guide](../tutorials/algorithm/looper/fusion) |
 | `ratings` — looper algorithm | `ratings` calls every candidate model and returns one OpenAI-compatible choice per successful model. `max_concurrent` limits parallel work; it does not limit the total number of candidates executed. | [`config/fragments/algorithm/looper/ratings.yaml`](https://github.com/vllm-project/semantic-router/blob/main/config/fragments/algorithm/looper/ratings.yaml) | [Guide](../tutorials/algorithm/looper/ratings) |
 | `remom` — looper algorithm | `remom` runs several candidate models across bounded rounds and synthesizes their responses into one answer. | [`config/fragments/algorithm/looper/remom.yaml`](https://github.com/vllm-project/semantic-router/blob/main/config/fragments/algorithm/looper/remom.yaml) | [Guide](../tutorials/algorithm/looper/remom) |
@@ -225,6 +226,29 @@ global:
       metrics:
         enabled: true
 ```
+
+For an authorized read-only MCP call, use the alternative tagged payload:
+
+```yaml
+workflow:
+  type: mcp_tool_call
+  authorization_group: mcp-users
+  mcp:
+    server_name: internal-catalog
+    endpoint: https://mcp.example.com
+    tool_name: lookup
+    arguments:
+      query: "{{user_content}}"
+    timeout_seconds: 5
+    max_response_bytes: 262144
+    max_result_characters: 8000
+    require_read_only: true
+```
+
+The router authorizes before discovery, executes only the configured tool when
+it advertises `readOnlyHint=true`, accepts text output only, and injects the
+bounded result as untrusted evidence. Route evaluation previews this workflow
+without resolving credentials or contacting the MCP server.
 
 Classifier backend failures remain `Unknown` while the complete boolean tree
 is evaluated. Set `rules.on_unknown` to `no_match`, `match`, or `fail_request`

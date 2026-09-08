@@ -28,7 +28,39 @@ func validateProviderReliability(modelName string, reliability ProviderReliabili
 	if err := validateProviderOutlierDetection(modelName, reliability); err != nil {
 		return err
 	}
-	return validateProviderHealthCheck(modelName, reliability)
+	if err := validateProviderHealthCheck(modelName, reliability); err != nil {
+		return err
+	}
+	return validateProviderCircuitBreaker(modelName, reliability)
+}
+
+func validateProviderCircuitBreaker(modelName string, reliability ProviderReliability) error {
+	if reliability.CircuitBreakerFailures < 0 || reliability.CircuitBreakerFailures > 100 {
+		return fmt.Errorf("providers.models[%s].reliability.circuit_breaker_failures must be between 0 and 100", modelName)
+	}
+	if reliability.CircuitBreakerFailures == 0 && reliability.CircuitBreakerOpenTime != "" {
+		return fmt.Errorf("providers.models[%s].reliability.circuit_breaker_open_time requires circuit_breaker_failures", modelName)
+	}
+	if reliability.CircuitBreakerFailures > 0 {
+		if strings.TrimSpace(reliability.CircuitBreakerOpenTime) == "" {
+			return fmt.Errorf("providers.models[%s].reliability.circuit_breaker_open_time is required when the runtime circuit breaker is enabled", modelName)
+		}
+		duration, err := time.ParseDuration(reliability.CircuitBreakerOpenTime)
+		if err != nil || duration <= 0 {
+			return fmt.Errorf("providers.models[%s].reliability.circuit_breaker_open_time must be a positive duration", modelName)
+		}
+	}
+	return nil
+}
+
+// GetProviderReliability returns the canonical reliability policy for a
+// logical model. The bool is false when the model is not configured.
+func (c *RouterConfig) GetProviderReliability(model string) (ProviderReliability, bool) {
+	if c == nil || c.ModelConfig == nil {
+		return ProviderReliability{}, false
+	}
+	params, ok := c.ModelConfig[strings.TrimSpace(model)]
+	return params.Reliability, ok
 }
 
 func validateProviderRetry(modelName string, reliability ProviderReliability) error {

@@ -60,6 +60,7 @@ func (r *OpenAIRouter) handleNonStreamingResponseBody(
 	}
 	r.persistResponseObject(ctx)
 	r.updateRouterReplayHallucinationStatus(ctx)
+	r.recordExecutionEvidence(ctx, completionLatency)
 	r.attachRouterReplayResponse(ctx, finalBody, true)
 	return response
 }

@@ -23,6 +23,7 @@ type RoutingDecisionEnvelope struct {
 	Eligibility   *services.ModelEligibility      `json:"eligibility,omitempty"`
 	Cost          *services.RequestCostEvaluation `json:"cost,omitempty"`
 	Workflow      *services.WorkflowEvaluation    `json:"workflow,omitempty"`
+	Resilience    *services.ResilienceEvaluation  `json:"resilience,omitempty"`
 	Signals       RoutingDecisionSignals          `json:"signals"`
 	Diagnostics   RoutingDecisionDiagnostics      `json:"diagnostics,omitempty"`
 	Trace         []decision.DecisionTrace        `json:"trace,omitempty"`
@@ -114,6 +115,7 @@ func newRoutingDecisionEnvelope(evaluated *services.EvalResponse) RoutingDecisio
 		Eligibility: evaluated.Eligibility,
 		Cost:        evaluated.Cost,
 		Workflow:    evaluated.Workflow,
+		Resilience:  evaluated.Resilience,
 		Signals: RoutingDecisionSignals{
 			Confidences: evaluated.SignalConfidences,
 			Values:      evaluated.SignalValues,

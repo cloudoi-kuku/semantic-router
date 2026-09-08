@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	ext_proc "github.com/envoyproxy/go-control-plane/envoy/service/ext_proc/v3"
 	"github.com/openai/openai-go"
@@ -134,6 +135,9 @@ func (r *OpenAIRouter) handleLooperExecution(
 	r.recordSuccessfulLooperExecution(
 		resp, request.Model, decision, reqCtx, semanticResponse, clientBody,
 	)
+	// The response is encoded before replay starts, so add the newly allocated
+	// correlation ID after the successful execution record exists.
+	addRouterReplayHeaderToImmediateResponse(response, reqCtx.RouterReplayID)
 	return response, nil
 }
 
@@ -270,11 +274,16 @@ func (r *OpenAIRouter) recordSuccessfulLooperExecution(
 	reqCtx.RequestModel = resp.Model
 	reqCtx.VSRSelectedModel = resp.Model
 	reqCtx.VSRSelectionMethod = resp.AlgorithmType
+	reqCtx.VSRModelAttempts = resp.Iterations
+	reqCtx.VSRProviderAttempts = resp.ProviderAttempts
 
 	// Capture router replay information if enabled
 	// ModelsUsed is the execution trace; resp.Model is the final response model.
 	r.startRouterReplay(reqCtx, originalModel, resp.Model, decision.Name)
 	r.updateLooperReplayUsage(reqCtx, resp.Usage)
+	if resp.AlgorithmType == config.DecisionAlgorithmFallback {
+		r.updateFallbackReplayCost(reqCtx, resp)
+	}
 	if resp.Usage.PromptTokens > 0 || resp.Usage.CompletionTokens > 0 {
 		// Looper usage is an aggregate across potentially differently priced
 		// calls. Preserve continuity and token totals without charging the whole
@@ -287,6 +296,7 @@ func (r *OpenAIRouter) recordSuccessfulLooperExecution(
 
 	// Update router replay with success status (looper returns immediate response with 200)
 	r.updateRouterReplayStatus(reqCtx, 200, false)
+	r.recordExecutionEvidence(reqCtx, time.Duration(resp.LatencyMs)*time.Millisecond)
 
 	// Attach response body to router replay record
 	r.attachRouterReplayResponse(reqCtx, clientBody, true)

@@ -20,6 +20,8 @@ providers:
         health_check_path: /health
         health_check_interval: 15s
         health_check_timeout: 3s
+        circuit_breaker_failures: 3
+        circuit_breaker_open_time: 30s
       backend_refs:
         - endpoint: 127.0.0.1:8000
 routing:
@@ -41,7 +43,9 @@ routing:
 		reliability.Consecutive5xx != 5 ||
 		reliability.BaseEjectionTime != "45s" ||
 		reliability.MaxEjectionPercent != 25 ||
-		reliability.HealthCheckPath != "/health" {
+		reliability.HealthCheckPath != "/health" ||
+		reliability.CircuitBreakerFailures != 3 ||
+		reliability.CircuitBreakerOpenTime != "30s" {
 		t.Fatalf("reliability did not normalize: %#v", reliability)
 	}
 }

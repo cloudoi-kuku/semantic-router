@@ -101,6 +101,7 @@ type EvalResponse struct {
 	Eligibility            *ModelEligibility                       `json:"eligibility,omitempty"`
 	Cost                   *RequestCostEvaluation                  `json:"cost,omitempty"`
 	Workflow               *WorkflowEvaluation                     `json:"workflow,omitempty"`
+	Resilience             *ResilienceEvaluation                   `json:"resilience,omitempty"`
 	RoutingDecision        string                                  `json:"routing_decision,omitempty"`
 	Metrics                *classification.SignalMetricsCollection `json:"metrics"`                      // Performance and confidence for each signal
 	SignalConfidences      map[string]float64                      `json:"signal_confidences,omitempty"` // Real ML confidence scores per signal, e.g. "domain:economics" -> 0.81
@@ -108,6 +109,18 @@ type EvalResponse struct {
 	SignalErrors           map[string]string                       `json:"signal_errors,omitempty"`
 	AppliedUnknownPolicies map[string]string                       `json:"applied_unknown_policies,omitempty"`
 	DecisionError          string                                  `json:"decision_error,omitempty"`
+}
+
+// ResilienceEvaluation is a non-executing preview of an ordered, bounded
+// fallback chain. It never probes a provider during dry-run.
+type ResilienceEvaluation struct {
+	ContractVersion string   `json:"contract_version"`
+	Type            string   `json:"type"`
+	Status          string   `json:"status"`
+	MaxAttempts     int      `json:"max_attempts"`
+	RetryOn         []string `json:"retry_on"`
+	CandidateModels []string `json:"candidate_models,omitempty"`
+	ExecutesModels  bool     `json:"executes_models"`
 }
 
 // WorkflowEvaluation describes a planned workflow without executing its tool.
@@ -129,11 +142,15 @@ type WorkflowAuthorizationEvidence struct {
 
 type WorkflowToolPlan struct {
 	Type                  string `json:"type"`
-	Provider              string `json:"provider"`
-	MaxResults            int    `json:"max_results"`
+	Provider              string `json:"provider,omitempty"`
+	ServerName            string `json:"server_name,omitempty"`
+	ToolName              string `json:"tool_name,omitempty"`
+	MaxResults            int    `json:"max_results,omitempty"`
 	TimeoutSeconds        int    `json:"timeout_seconds"`
 	MaxResponseBytes      int64  `json:"max_response_bytes"`
-	MaxEvidenceCharacters int    `json:"max_evidence_characters"`
+	MaxEvidenceCharacters int    `json:"max_evidence_characters,omitempty"`
+	MaxResultCharacters   int    `json:"max_result_characters,omitempty"`
+	RequiresReadOnly      bool   `json:"requires_read_only,omitempty"`
 }
 
 type ModelEligibility struct {
@@ -162,14 +179,16 @@ type RequestCostEvaluation struct {
 }
 
 type CandidateCostEstimate struct {
-	Model         string  `json:"model"`
-	EstimatedCost float64 `json:"estimated_cost,omitempty"`
-	Eligible      bool    `json:"eligible"`
-	Status        string  `json:"status"`
-	PriceVersion  string  `json:"price_version,omitempty"`
-	PriceSource   string  `json:"price_source,omitempty"`
-	EffectiveAt   string  `json:"effective_at,omitempty"`
-	ExpiresAt     string  `json:"expires_at,omitempty"`
+	Model                      string  `json:"model"`
+	SingleAttemptEstimatedCost float64 `json:"single_attempt_estimated_cost,omitempty"`
+	EstimatedCost              float64 `json:"estimated_cost,omitempty"`
+	MaxProviderAttempts        int     `json:"max_provider_attempts,omitempty"`
+	Eligible                   bool    `json:"eligible"`
+	Status                     string  `json:"status"`
+	PriceVersion               string  `json:"price_version,omitempty"`
+	PriceSource                string  `json:"price_source,omitempty"`
+	EffectiveAt                string  `json:"effective_at,omitempty"`
+	ExpiresAt                  string  `json:"expires_at,omitempty"`
 }
 
 // EvalModelSelectionInput is the content-minimized selection contract passed

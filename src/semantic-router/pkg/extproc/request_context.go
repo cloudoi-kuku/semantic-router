@@ -146,6 +146,9 @@ type RequestContext struct {
 	VSRWorkflowType                 string           // Selected provider-independent workflow type
 	VSRWorkflowStatus               string           // authorized, completed, or failed
 	VSRWorkflowEvidenceCount        int              // Number of normalized evidence items injected for synthesis
+	VSRProviderAttempts             int              // Actual same-model attempts reported by Envoy; defaults to one when unavailable
+	VSRModelAttempts                int              // Model executions made by a Looper algorithm
+	VSRExecutionEvidenceRecorded    bool             // Guards the privacy-safe replay evidence outcome against duplicate finalizers
 	// VSREligibleModelRefs is the selected decision's model set after applying
 	// request contracts. Loopers consume this exact set; broader Router Learning
 	// candidate sets must independently apply the same request contracts.

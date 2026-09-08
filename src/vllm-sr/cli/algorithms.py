@@ -61,6 +61,26 @@ class RatingsAlgorithmConfig(BaseModel):
     on_error: str | None = "skip"
 
 
+class FallbackAlgorithmConfig(BaseModel):
+    """Bounded, ordered cross-provider availability fallback."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    max_attempts: int = Field(ge=1)
+    retry_on: (
+        list[
+            Literal[
+                "transport_error",
+                "timeout",
+                "rate_limited",
+                "server_error",
+                "invalid_response",
+            ]
+        ]
+        | None
+    ) = None
+
+
 class ReMoMAlgorithmConfig(BaseModel):
     """Configuration for ReMoM (Reasoning for Mixture of Models) algorithm.
 
@@ -404,6 +424,7 @@ class AlgorithmConfig(BaseModel):
     Supports three categories of algorithms:
 
     1. Looper algorithms (multi-model execution):
+       - "fallback": Try providers in declared order after retryable failures
        - "confidence": Try smaller models first, escalate if confidence is low
        - "ratings": Coordinate bounded candidate execution
        - "remom": Multi-round parallel reasoning with intelligent synthesis
@@ -434,6 +455,7 @@ class AlgorithmConfig(BaseModel):
     #            "kmeans", "svm", "mlp", "multi_factor", "latency_aware")
     type: Literal[
         "confidence",
+        "fallback",
         "ratings",
         "remom",
         "fusion",
@@ -453,6 +475,7 @@ class AlgorithmConfig(BaseModel):
 
     # Looper algorithm configurations
     confidence: ConfidenceAlgorithmConfig | None = None
+    fallback: FallbackAlgorithmConfig | None = None
     ratings: RatingsAlgorithmConfig | None = None
     remom: ReMoMAlgorithmConfig | None = None
     fusion: FusionAlgorithmConfig | None = None
@@ -470,6 +493,13 @@ class AlgorithmConfig(BaseModel):
 
     @model_validator(mode="after")
     def normalize_prompt_fallback(self):
+        if self.type == "fallback":
+            if self.fallback is None:
+                raise ValueError(
+                    "algorithm.type=fallback requires fallback configuration"
+                )
+        elif self.fallback is not None:
+            raise ValueError("fallback configuration requires algorithm.type=fallback")
         if self.type == "prompt":
             if self.prompt is None:
                 raise ValueError("algorithm.type=prompt requires prompt configuration")

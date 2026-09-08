@@ -221,13 +221,7 @@ func (d *decompiler) decompileDecision(dec config.Decision) {
 			budget.Currency, strconv.FormatFloat(budget.MaxEstimatedCost, 'f', -1, 64), budget.OutputTokenBound,
 			budget.ReasoningTokenBound, budget.RequirePricing, budget.RequireCurrentPricing)
 	}
-	if workflow := dec.Workflow; workflow != nil && workflow.WebSearch != nil {
-		search := workflow.WebSearch
-		d.write("  WORKFLOW { type: %q, authorization_group: %q, provider: %q, endpoint: %q, api_key_env: %q, api_key_header: %q, timeout_seconds: %d, max_results: %d, max_query_characters: %d, max_response_bytes: %d, max_evidence_characters: %d }\n",
-			workflow.Type, workflow.AuthorizationGroup, search.Provider, search.Endpoint,
-			search.APIKeyEnv, search.APIKeyHeader, search.TimeoutSeconds, search.MaxResults,
-			search.MaxQueryCharacters, search.MaxResponseBytes, search.MaxEvidenceCharacters)
-	}
+	d.decompileDecisionWorkflow(dec.Workflow)
 	if dec.Action != nil {
 		d.write("  ACTION %s %q\n", dec.Action.Type, dec.Action.Destination)
 	}
@@ -241,6 +235,25 @@ func (d *decompiler) decompileDecision(dec config.Decision) {
 		d.decompileEmit(e)
 	}
 	d.write("}\n\n")
+}
+
+func (d *decompiler) decompileDecisionWorkflow(workflow *config.WorkflowConfig) {
+	if workflow == nil {
+		return
+	}
+	if search := workflow.WebSearch; search != nil {
+		d.write("  WORKFLOW { type: %q, authorization_group: %q, provider: %q, endpoint: %q, api_key_env: %q, api_key_header: %q, timeout_seconds: %d, max_results: %d, max_query_characters: %d, max_response_bytes: %d, max_evidence_characters: %d }\n",
+			workflow.Type, workflow.AuthorizationGroup, search.Provider, search.Endpoint,
+			search.APIKeyEnv, search.APIKeyHeader, search.TimeoutSeconds, search.MaxResults,
+			search.MaxQueryCharacters, search.MaxResponseBytes, search.MaxEvidenceCharacters)
+	}
+	if mcpWorkflow := workflow.MCP; mcpWorkflow != nil {
+		d.write("  WORKFLOW { type: %q, authorization_group: %q, server_name: %q, endpoint: %q, tool_name: %q, arguments: %s, api_key_env: %q, api_key_header: %q, timeout_seconds: %d, max_response_bytes: %d, max_result_characters: %d, require_read_only: %t }\n",
+			workflow.Type, workflow.AuthorizationGroup, mcpWorkflow.ServerName, mcpWorkflow.Endpoint,
+			mcpWorkflow.ToolName, formatPluginConfigValue(mcpWorkflow.Arguments), mcpWorkflow.APIKeyEnv,
+			mcpWorkflow.APIKeyHeader, mcpWorkflow.TimeoutSeconds, mcpWorkflow.MaxResponseBytes,
+			mcpWorkflow.MaxResultCharacters, mcpWorkflow.RequireReadOnly)
+	}
 }
 
 func (d *decompiler) writeDecisionHeader(dec config.Decision) {

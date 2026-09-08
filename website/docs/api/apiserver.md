@@ -359,3 +359,9 @@ These require the corresponding service to be enabled; otherwise the API returns
 | `POST` | `/api/v1/context-compression/preview` | Preview context compression without persistence |
 | `POST` | `/api/v1/context-compression/recovery/invalidate` | Invalidate a trusted context-recovery request scope |
 <!-- END-GENERATED-ENDPOINT-INDEX -->
+
+Router Replay aggregate responses include an `execution_evidence` summary for
+versioned, content-free runtime outcomes: latency, attempts, retries, fallback,
+and explicit quality-state counts. Token usage, actual cost, baseline cost, and
+savings remain in the aggregate cost and token summaries. A quality state of
+`not_measured` is distinct from a passed quality gate.

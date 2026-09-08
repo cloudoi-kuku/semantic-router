@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -30,6 +31,23 @@ import (
 	"github.com/vllm-project/semantic-router/src/semantic-router/pkg/config"
 	"github.com/vllm-project/semantic-router/src/semantic-router/pkg/observability/logging"
 )
+
+// HTTPStatusError preserves the provider status without retaining or exposing
+// its response body. Multi-model policies use it to distinguish rate limits
+// and server outages from invalid successful payloads.
+type HTTPStatusError struct {
+	StatusCode       int
+	BodyBytes        int
+	Truncated        bool
+	ProviderAttempts int
+}
+
+func (e *HTTPStatusError) Error() string {
+	return fmt.Sprintf(
+		"request failed with status %d (error_body_bytes=%d, truncated=%t)",
+		e.StatusCode, e.BodyBytes, e.Truncated,
+	)
+}
 
 // Client handles HTTP requests to OpenAI-compatible endpoints
 type Client struct {
@@ -140,6 +158,10 @@ type ModelResponse struct {
 	// LatencyMs is the wall-clock duration in milliseconds of the upstream
 	// round-trip (request + read + parse) for this single call.
 	LatencyMs int64
+
+	// ProviderAttempts is the Envoy-reported same-model attempt count. It is
+	// at least one even when the upstream does not expose the header.
+	ProviderAttempts int
 }
 
 // LogprobsConfig controls logprobs behavior for model calls
@@ -236,8 +258,18 @@ func (c *Client) CallModel(ctx context.Context, req *openai.ChatCompletionNewPar
 	if err != nil {
 		return nil, err
 	}
+	result.ProviderAttempts = providerAttemptCount(resp)
 	result.LatencyMs = time.Since(start).Milliseconds()
 	return result, nil
+}
+
+func providerAttemptCount(resp *http.Response) int {
+	if resp != nil {
+		if attempts, err := strconv.Atoi(resp.Header.Get("x-envoy-attempt-count")); err == nil && attempts > 0 {
+			return attempts
+		}
+	}
+	return 1
 }
 
 // parseNonStreamingResponse parses a non-streaming JSON response

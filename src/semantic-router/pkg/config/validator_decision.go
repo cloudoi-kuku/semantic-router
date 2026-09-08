@@ -662,13 +662,14 @@ func validateMigratedLearningAlgorithm(decisionName string, normalizedType strin
 }
 
 func configuredAlgorithmBlocks(algorithm *AlgorithmConfig) []string {
-	configuredBlocks := make([]string, 0, 14)
+	configuredBlocks := make([]string, 0, 15)
 	addBlock := func(name string, configured bool) {
 		if configured {
 			configuredBlocks = append(configuredBlocks, name)
 		}
 	}
 
+	addBlock("fallback", algorithm.Fallback != nil)
 	addBlock("confidence", algorithm.Confidence != nil)
 	addBlock("ratings", algorithm.Ratings != nil)
 	addBlock("remom", algorithm.ReMoM != nil)
@@ -689,6 +690,7 @@ func configuredAlgorithmBlocks(algorithm *AlgorithmConfig) []string {
 
 func expectedAlgorithmBlock(normalizedType string) (string, bool) {
 	expectedBlockByType := map[string]string{
+		"fallback":      "fallback",
 		"confidence":    "confidence",
 		"ratings":       "ratings",
 		"remom":         "remom",
@@ -707,6 +709,8 @@ func expectedAlgorithmBlock(normalizedType string) (string, bool) {
 
 func validateSpecializedAlgorithmConfig(decisionName string, modelRefs []ModelRef, normalizedType string, algorithm *AlgorithmConfig) error {
 	switch normalizedType {
+	case "fallback":
+		return validateFallbackAlgorithmConfig(decisionName, modelRefs, algorithm.Fallback)
 	case "confidence":
 		return wrapAlgorithmValidationError(decisionName, "confidence", ValidateConfidenceAlgorithmConfig(algorithm.Confidence))
 	case "latency_aware":

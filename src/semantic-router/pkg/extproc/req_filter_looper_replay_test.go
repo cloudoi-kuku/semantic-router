@@ -274,6 +274,9 @@ func assertLooperResponseFinalModel(t *testing.T, response *ext_proc.ProcessingR
 	if ctx.VSRSelectedModel != "model-b" || headerMap[headers.VSRSelectedModel] != "model-b" {
 		t.Fatalf("final model mismatch: context=%q headers=%q", ctx.VSRSelectedModel, headerMap[headers.VSRSelectedModel])
 	}
+	if headerMap[headers.RouterReplayID] != ctx.RouterReplayID {
+		t.Fatalf("replay response header = %q, want %q", headerMap[headers.RouterReplayID], ctx.RouterReplayID)
+	}
 }
 
 func assertReplayFinalModel(t *testing.T, record store.Record, found bool) {

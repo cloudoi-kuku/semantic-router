@@ -24,6 +24,7 @@ func TestDecisionAlgorithmCatalog_AllTypesHaveTier(t *testing.T) {
 func TestSupportedLooperAlgorithmTypes(t *testing.T) {
 	want := []string{
 		DecisionAlgorithmConfidence,
+		DecisionAlgorithmFallback,
 		DecisionAlgorithmFusion,
 		DecisionAlgorithmRatings,
 		DecisionAlgorithmReMoM,
@@ -55,7 +56,7 @@ func TestSupportedLooperAlgorithmTypes(t *testing.T) {
 
 func TestDecisionAlgorithmCatalog_PublicAlgorithmSurface(t *testing.T) {
 	publicTypes := []string{
-		"automix", "confidence", "fusion", "hybrid", "kmeans",
+		"automix", "confidence", "fallback", "fusion", "hybrid", "kmeans",
 		"knn", "latency_aware", "mlp", "multi_factor", "ratings",
 		"remom", "router_dc", "static", "svm",
 	}

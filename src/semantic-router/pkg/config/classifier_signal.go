@@ -2,6 +2,10 @@ package config
 
 const SignalTypeClassifier = "classifier"
 
+// LocalSemanticClassifierContractVersion identifies the content-free evidence
+// contract emitted for local embedding/prototype task classification.
+const LocalSemanticClassifierContractVersion = "vllm-sr/local-semantic-classifier/v1alpha1"
+
 // Backend types a ClassifierSignalRule may declare. They are named here rather
 // than spelled inline so the validator and the builder cannot drift apart.
 const (
