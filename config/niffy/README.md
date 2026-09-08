@@ -1,8 +1,8 @@
 # Niffy development profile
 
-`config.yaml` is the first cost-oriented Niffy routing profile. It exposes
-one OpenAI-compatible endpoint through the `niffy/auto` model name and maps
-requests to three logical model tiers:
+`config.yaml` is the cost-oriented Niffy routing profile. It exposes the
+general `niffy/auto` entrypoint and the isolated `niffy/code` coding entrypoint,
+then maps requests to three logical model tiers:
 
 | Decision | Provider model | Purpose |
 | --- | --- | --- |
@@ -30,6 +30,54 @@ Start the minimal local router stack with the same exported environment:
   --minimal
 ```
 
+That command is convenient while editing but is not the NIFFY-11 release
+path. Build content-addressed, version-tagged artifacts and generate their
+local release manifest with:
+
+```bash
+make niffy-release NIFFY_ALLOW_DIRTY=1
+```
+
+`NIFFY_ALLOW_DIRTY=1` is only for validating an uncommitted development tree;
+omit it for a reviewed release. The supported start command verifies that the
+config and local image IDs still match the manifest and refuses to pull a
+replacement image:
+
+```bash
+make niffy-release-start
+```
+
+The verified release starts in minimal mode by default so the dashboard does
+not receive the local Docker socket. Use `NIFFY_MINIMAL=0` only for a trusted
+local dashboard and observability session. A release build defaults to
+`niffy/router:v0.4.0` and
+`niffy/dashboard:v0.4.0`; the registry and tag can be overridden with
+`NIFFY_REGISTRY` and `NIFFY_TAG`. Published environments should retain the
+manifest's image IDs or replace the local references with registry digest
+references after pushing. The manifest also records the exact path, size, and
+SHA-256 digest of every external classifier/embedding model file. Seed the
+release model cache from a trusted artifact copy before starting on another
+host; startup verification rejects missing or changed weights.
+
+Keep a copy of each published manifest with the release artifacts. Rollback is
+the same verified start operation with the previous immutable tag, manifest,
+and matching configuration:
+
+```bash
+make niffy-release-start \
+  NIFFY_TAG=v0.2.0 \
+  NIFFY_MANIFEST=/path/to/niffy-v0.2.0-release-manifest.json
+```
+
+The bundled profile is safe for a loopback development host, not direct public
+Internet exposure. The management endpoint remains host-loopback-only and the
+verified start defaults to the minimal stack. A production gateway must
+authenticate inference callers, strip caller-provided identity headers, inject
+the trusted tenant identity, terminate TLS, enforce rate limits, and keep the
+management API on a private authenticated control-plane network. If the local
+dashboard is enabled with `NIFFY_MINIMAL=0`, it receives the Docker socket and
+must be treated as host-administrator access.
+
 Applications can then send their existing OpenAI-style request to the router:
 
 ```bash
@@ -40,6 +88,58 @@ curl http://localhost:8899/v1/chat/completions \
     "messages": [{"role": "user", "content": "Explain DNS in one paragraph."}]
   }'
 ```
+
+Use `niffy/code` when the calling product already knows the interaction is a
+coding workload. This avoids mixing broad chat heuristics with coding policy:
+
+```bash
+curl http://localhost:8899/v1/chat/completions \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "model": "niffy/code",
+    "messages": [{"role": "user", "content": "Write a unit test for this parser."}]
+  }'
+```
+
+The coding recipe has five ordered decisions:
+
+| Decision | Tier | Trigger |
+| --- | --- | --- |
+| `code-evidence-escalation-route` | reasoning | Trusted orchestrator role plus a failed patch, build, test, or review status |
+| `code-reasoning-route` | reasoning | Complex/security/concurrency/migration intent or at least 12K estimated input tokens |
+| `code-tool-route` | general | Repository, terminal, patch, build, test, or MCP intent |
+| `code-general-route` | general | Ordinary implementation, refactoring, bug-fix, and unit-test generation |
+| `code-economical-route` | economical | Simple explanation or bounded transformation fallback |
+
+`code-tool-route` only selects a model that can emit tool calls. Niffy does not
+grant filesystem, terminal, source-control, or MCP authority. The calling
+product must provide its own sandbox, allowlist, approval, and execution loop.
+
+Premium retry escalation is deliberately not inferred from prompt text. A
+gateway must strip caller-provided identity headers and inject both a verified
+user ID and membership in `code-validation-producers`. The coding orchestrator
+then supplies one of `patch_failed`, `build_failed`, `test_failed`, or
+`review_failed` as the `niffy.code.validation` request metadata value. The
+metadata or trusted role alone is insufficient to match the escalation route.
+The `niffy-economy` tenant policy can still deny the reasoning model.
+
+Routing fidelity is versioned in `probes.yaml`. Release promotion additionally
+uses an objective coding-task ledger and the NIFFY-12 outcome gate:
+
+```bash
+make niffy-code-eval NIFFY_CODE_LEDGER=/path/to/code-evaluation.json
+```
+
+The JSON ledger uses schema `niffy/code-evaluation/v1`. Every task declares a
+premium-only `baseline_cost_usd`, required checks from `patch`, `build`, `test`,
+and `review`, and an ordered `attempts` list. An attempt records its tier, actual
+USD cost, trigger, and check statuses (`passed`, `failed`, or `not_run`). The
+first trigger is `initial` or `classified_complex`; every later, higher-tier
+attempt must use `<check>_failed` matching a failed check on the immediately
+preceding attempt. Thresholds set the minimum validated-task rate, maximum
+total trajectory cost per validated outcome, and minimum savings versus the
+premium-only baseline. Failed trajectories remain in total cost and cannot
+make the result look artificially economical.
 
 To inspect the route without generating a provider response, open **Build →
 Outcomes → Route Inspector** in the dashboard. Products should use the stable

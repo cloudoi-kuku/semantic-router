@@ -113,7 +113,7 @@ runtime dependency; they do not define routing behavior by themselves.
 - `routing.decisions[].required_capabilities` is a provider-neutral hard gate
   over model-card capabilities. It runs before ranking; unknown model metadata
   fails closed when a requirement is declared. The v1alpha1 vocabulary is
-  `chat`, `text`, `reasoning`, `tool_calling`, `parallel_tool_calling`,
+  `chat`, `text`, `code`, `reasoning`, `tool_calling`, `parallel_tool_calling`,
   `structured_output`, `json_schema`, `vision`, `audio`, `video`, `file`,
   `embeddings`, and `image_generation`.
 - `providers.models[].pricing` may pin `version`, `source`, `unit`,

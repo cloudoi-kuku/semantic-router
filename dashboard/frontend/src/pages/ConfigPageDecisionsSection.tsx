@@ -47,6 +47,7 @@ type DecisionRow = DecisionConfig
 const REQUIRED_MODEL_CAPABILITIES = [
   'chat',
   'text',
+  'code',
   'reasoning',
   'tool_calling',
   'parallel_tool_calling',

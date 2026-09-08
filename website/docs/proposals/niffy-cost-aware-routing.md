@@ -327,6 +327,22 @@ header and is reduced to a boolean presence signal in public evidence. The
 Niffy profile also moves Router Replay and startup status to Redis so those
 records survive router-container restarts.
 
+NIFFY-12 adds the isolated `niffy/code` entrypoint. Its recipe classifies
+ordinary implementation, repository/tool intent, complex coding demand, and
+large context independently from general chat policy. The provider-neutral
+capability catalogue now permits `code` as a hard requirement, allowing all
+three economic tiers to advertise coding fitness without encoding a provider
+name in a decision. Tool-capable routing never grants execution authority.
+
+Coding retry escalation requires two independent inputs: an objective
+`patch_failed`, `build_failed`, `test_failed`, or `review_failed` status in
+request metadata and the trusted `code_validator` role injected for an
+authenticated coding orchestrator. Prompt text and untrusted metadata alone
+cannot select this escalation path. Offline promotion uses the versioned
+`niffy/code-evaluation/v1` ledger to verify each escalation against the
+previous attempt's failed check and gates total trajectory cost per validated
+outcome, validation rate, and savings against a premium-only baseline.
+
 ## Evaluation Strategy
 
 Development uses four complementary suites:

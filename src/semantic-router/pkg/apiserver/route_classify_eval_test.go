@@ -177,6 +177,36 @@ func TestHandleEvalClassification_AcceptsMessagesArray(t *testing.T) {
 	}
 }
 
+func TestHandleEvalClassification_ForwardsTrustedRoutingHeaders(t *testing.T) {
+	fakeSvc := &evalCaptureClassificationService{}
+	apiServer := &ClassificationAPIServer{
+		classificationSvc: fakeSvc,
+		config: &config.RouterConfig{Authz: config.AuthzConfig{
+			Identity: config.IdentityConfig{
+				UserIDHeader:     "x-test-user",
+				UserGroupsHeader: "x-test-groups",
+			},
+		}},
+	}
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/api/v1/eval",
+		bytes.NewBufferString(`{"text":"repair the change"}`),
+	)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("x-test-user", "worker-1")
+	req.Header.Set("x-test-groups", "code-validation-producers")
+	rr := httptest.NewRecorder()
+
+	apiServer.handleEvalClassification(rr, req)
+
+	requireEvalHTTPStatus(t, rr)
+	if got := fakeSvc.lastEvalReq.Headers; got["x-test-user"] != "worker-1" ||
+		got["x-test-groups"] != "code-validation-producers" {
+		t.Fatalf("trusted routing headers were not forwarded: %#v", got)
+	}
+}
+
 func mustMarshalEvalRequest(t *testing.T, request any) []byte {
 	t.Helper()
 	body, err := json.Marshal(request)

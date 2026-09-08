@@ -22,12 +22,15 @@ def http_json(
     url: str,
     payload: dict[str, Any] | None = None,
     timeout_seconds: float = 60.0,
+    extra_headers: dict[str, str] | None = None,
 ) -> tuple[int, dict[str, Any] | list[Any] | str]:
     body = None
     headers = {"Accept": "application/json"}
     token = os.getenv(MANAGEMENT_TOKEN_ENV, "").strip()
     if token:
         headers["Authorization"] = f"Bearer {token}"
+    if extra_headers:
+        headers.update(extra_headers)
     if payload is not None:
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
         headers["Content-Type"] = "application/json"

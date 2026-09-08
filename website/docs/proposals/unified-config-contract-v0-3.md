@@ -57,7 +57,7 @@ credentials.
 
 Decisions may declare `required_capabilities`. The router applies these as a
 hard eligibility filter against `routing.modelCards[].capabilities` before
-selection. The versioned v1alpha1 vocabulary is `chat`, `text`, `reasoning`,
+selection. The versioned v1alpha1 vocabulary is `chat`, `text`, `code`, `reasoning`,
 `tool_calling`, `parallel_tool_calling`, `structured_output`, `json_schema`,
 `vision`, `audio`, `video`, `file`, `embeddings`, and `image_generation`.
 Additional model-card values remain

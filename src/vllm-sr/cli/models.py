@@ -31,6 +31,7 @@ RoutingStrategy = Literal["priority", "confidence"]
 RequiredModelCapability = Literal[
     "chat",
     "text",
+    "code",
     "reasoning",
     "tool_calling",
     "parallel_tool_calling",

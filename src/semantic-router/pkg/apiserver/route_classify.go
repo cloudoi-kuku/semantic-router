@@ -43,6 +43,7 @@ func (s *ClassificationAPIServer) handleIntentClassification(w http.ResponseWrit
 		s.writeJSONRequestError(w, err)
 		return
 	}
+	s.populateTrustedRoutingHeaders(&req, r)
 
 	// Use signal-driven classification (always uses signal-driven architecture)
 	response, err := s.classificationSvc.ClassifyIntent(req)
@@ -63,6 +64,7 @@ func (s *ClassificationAPIServer) handleEvalClassification(w http.ResponseWriter
 		s.writeJSONRequestError(w, err)
 		return
 	}
+	s.populateTrustedRoutingHeaders(&req, r)
 
 	if req.Options == nil {
 		req.Options = &services.IntentOptions{}

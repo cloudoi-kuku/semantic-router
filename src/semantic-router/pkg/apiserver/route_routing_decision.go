@@ -71,6 +71,7 @@ func (s *ClassificationAPIServer) handleRoutingDecision(w http.ResponseWriter, r
 		s.writeJSONRequestError(w, err)
 		return
 	}
+	s.populateTrustedRoutingHeaders(&req, r)
 
 	if req.Options == nil {
 		req.Options = &services.IntentOptions{}
@@ -103,6 +104,28 @@ func (s *ClassificationAPIServer) handleRoutingDecision(w http.ResponseWriter, r
 		"ROUTING_DECISION_UNAVAILABLE",
 		"routing decision evaluation returned no result",
 	)
+}
+
+// populateTrustedRoutingHeaders copies only the configured authz identity
+// headers from the HTTP envelope. IntentRequest excludes them from JSON so a
+// request body cannot manufacture trusted identity.
+func (s *ClassificationAPIServer) populateTrustedRoutingHeaders(
+	req *services.IntentRequest,
+	httpRequest *http.Request,
+) {
+	if req == nil || httpRequest == nil {
+		return
+	}
+	cfg := s.currentConfig()
+	if cfg == nil {
+		return
+	}
+	userIDHeader := cfg.Authz.Identity.GetUserIDHeader()
+	userGroupsHeader := cfg.Authz.Identity.GetUserGroupsHeader()
+	req.Headers = map[string]string{
+		userIDHeader:     httpRequest.Header.Get(userIDHeader),
+		userGroupsHeader: httpRequest.Header.Get(userGroupsHeader),
+	}
 }
 
 func newRoutingDecisionEnvelope(evaluated *services.EvalResponse, schemaVersion string) RoutingDecisionEnvelope {

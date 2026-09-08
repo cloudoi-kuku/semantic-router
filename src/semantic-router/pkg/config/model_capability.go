@@ -11,6 +11,7 @@ const ModelCapabilityCatalogVersion = "vllm-sr/model-capability-catalog/v1alpha1
 const (
 	ModelCapabilityChat             = "chat"
 	ModelCapabilityText             = "text"
+	ModelCapabilityCode             = "code"
 	ModelCapabilityReasoning        = "reasoning"
 	ModelCapabilityToolCalling      = "tool_calling"
 	ModelCapabilityParallelTools    = "parallel_tool_calling"
@@ -27,6 +28,7 @@ const (
 var supportedRequiredModelCapabilities = map[string]struct{}{
 	ModelCapabilityChat:             {},
 	ModelCapabilityText:             {},
+	ModelCapabilityCode:             {},
 	ModelCapabilityReasoning:        {},
 	ModelCapabilityToolCalling:      {},
 	ModelCapabilityParallelTools:    {},

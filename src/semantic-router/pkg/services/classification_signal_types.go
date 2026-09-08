@@ -32,6 +32,9 @@ type IntentRequest struct {
 	Model                 string            `json:"model,omitempty"`
 	Metadata              map[string]string `json:"metadata,omitempty"`
 	Options               *IntentOptions    `json:"options,omitempty"`
+	// Headers contains only trusted routing headers copied by the API server.
+	// It is never decoded from JSON or included in evaluation responses.
+	Headers map[string]string `json:"-"`
 	// TenantID is populated only from a trusted request header by the product
 	// routing endpoint. It is never decoded from JSON or returned to callers.
 	TenantID string `json:"-"`

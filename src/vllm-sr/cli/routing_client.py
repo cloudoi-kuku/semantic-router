@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
-from typing import Any, Mapping, Optional
+from collections.abc import Mapping
+from typing import Any
 
 import requests
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 ROUTING_DECISION_SCHEMA_V1 = "vllm-sr/routing-decision/v1"
+HTTP_ERROR_STATUS = 400
 
 
 class RouteSelection(BaseModel):
@@ -48,7 +50,7 @@ class RoutingDecisionResponse(BaseModel):
     dry_run: bool
     route: RouteIdentity
     selection: RouteSelection
-    tenant_policy: Optional[TenantPolicyEvidence] = None
+    tenant_policy: TenantPolicyEvidence | None = None
 
 
 class RoutingAPIError(RuntimeError):
@@ -106,11 +108,11 @@ class SemanticRouterClient:
             json=dict(payload),
             timeout=self.timeout,
         )
-        if response.status_code >= 400:
+        if response.status_code >= HTTP_ERROR_STATUS:
             raise RoutingAPIError(response.status_code, _response_error_code(response))
         try:
             decision = RoutingDecisionResponse.model_validate(response.json())
-        except (ValueError, TypeError, ValidationError) as exc:
+        except (ValueError, TypeError, ValidationError):
             raise RoutingCompatibilityError(
                 "routing API returned an invalid response contract"
             ) from None

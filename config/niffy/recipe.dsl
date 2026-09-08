@@ -39,21 +39,21 @@ SIGNAL complexity reasoning_demand {
 
 MODEL niffy-cheap {
   description: "Economical default for direct questions, summaries, and routine chat."
-  capabilities: ["chat", "text", "summarization"]
+  capabilities: ["chat", "text", "summarization", "code"]
   tags: ["provider:mistral", "tier:cheap"]
   modality: "text"
 }
 
 MODEL niffy-general {
   description: "General model selected when a request indicates live-search or tool intent."
-  capabilities: ["chat", "text", "tool_calling"]
+  capabilities: ["chat", "text", "code", "tool_calling"]
   tags: ["provider:xai", "tier:general"]
   modality: "text"
 }
 
 MODEL niffy-reasoning {
   description: "Higher-cost model reserved for complex analysis and reasoning."
-  capabilities: ["chat", "text", "reasoning", "code"]
+  capabilities: ["chat", "text", "reasoning", "code", "tool_calling"]
   tags: ["provider:openai", "tier:reasoning"]
   modality: "text"
 }
@@ -105,5 +105,138 @@ ROUTE economical-default-route (description = "Select Mistral for all requests n
     max_records: 1000
     capture_request_body: false
     capture_response_body: false
+  }
+}
+
+# =============================================================================
+# ENTRYPOINTS
+# =============================================================================
+
+ENTRYPOINT {
+  model_names: ["niffy/code"]
+  recipe: "code"
+}
+
+# =============================================================================
+# RECIPE code
+# =============================================================================
+
+RECIPE code (description = "Provider-neutral coding policy with evidence-gated premium escalation. Tool execution remains the responsibility of an authorized caller.") {
+  ROUTING {
+    strategy: priority
+  }
+
+  SIGNAL keyword code_tool_task {
+    operator: "OR"
+    keywords: ["edit the file", "modify the code", "apply a patch", "inspect the repository", "search the codebase", "run the tests", "run the build", "execute the command", "use the terminal", "use mcp", "call a tool"]
+  }
+
+  SIGNAL keyword code_general_task {
+    operator: "OR"
+    keywords: ["implement", "write code", "generate code", "fix this bug", "refactor", "add unit tests", "write a unit test", "write a test", "create a function", "add an endpoint", "update this class"]
+  }
+
+  SIGNAL keyword code_reasoning_task {
+    operator: "OR"
+    keywords: ["architecture", "security review", "threat model", "race condition", "deadlock", "distributed system", "root cause", "data migration", "breaking change", "compare approaches", "prove correctness", "multiple services"]
+  }
+
+  SIGNAL context code_large_context {
+    description: "Large repository or multi-file context that needs stronger synthesis."
+    min_tokens: "12K"
+    max_tokens: "262K"
+  }
+
+  SIGNAL complexity code_reasoning_demand {
+    threshold: 0.20
+    description: "Calibrated local prototype margin for complex coding work."
+    hard: { candidates: ["diagnose an intermittent concurrency failure across several components", "design a secure migration while preserving compatibility and rollback", "compare implementation architectures and justify their tradeoffs", "reason about correctness across multiple files and services"] }
+    easy: { candidates: ["explain one short code fragment", "rename a variable in one function", "write a small deterministic helper", "summarize a compiler error briefly"] }
+  }
+
+  SIGNAL authz code_validator {
+    role: "code_validator"
+    description: "Trusted coding orchestrators allowed to submit validation outcomes."
+    subjects: [{ kind: "Group", name: "code-validation-producers" }]
+  }
+
+  SIGNAL metadata code_validation_failed {
+    description: "Objective patch, build, test, or review evidence reported a failure."
+    key: "niffy.code.validation"
+    predicate: { in: ["patch_failed", "build_failed", "test_failed", "review_failed"] }
+  }
+
+  ROUTE code-evidence-escalation-route (description = "Escalate only when a trusted orchestrator reports objective validation failure.") {
+    PRIORITY 500
+    WHEN authz("code_validator") AND metadata("code_validation_failed")
+    REQUIRES ["chat", "code", "reasoning"]
+    BUDGET { currency: "USD", max_estimated_cost: 0.25, output_token_bound: 4096, reasoning_token_bound: 4096, require_pricing: true, require_current_pricing: true }
+    MODEL "niffy-reasoning" (reasoning = true, effort = "medium")
+    ALGORITHM static
+    PLUGIN router_replay {
+      enabled: true
+      max_records: 1000
+      capture_request_body: false
+      capture_response_body: false
+    }
+  }
+
+  ROUTE code-reasoning-route (description = "Route intrinsically complex coding work to the reasoning tier.") {
+    PRIORITY 400
+    WHEN keyword("code_reasoning_task") OR complexity("code_reasoning_demand:hard") OR context("code_large_context")
+    REQUIRES ["chat", "code", "reasoning"]
+    BUDGET { currency: "USD", max_estimated_cost: 0.25, output_token_bound: 4096, reasoning_token_bound: 4096, require_pricing: true, require_current_pricing: true }
+    MODEL "niffy-reasoning" (reasoning = true, effort = "medium")
+    ALGORITHM static
+    PLUGIN router_replay {
+      enabled: true
+      max_records: 1000
+      capture_request_body: false
+      capture_response_body: false
+    }
+  }
+
+  ROUTE code-tool-route (description = "Select a tool-capable coding model; the caller remains responsible for authorizing and executing repository or terminal operations.") {
+    PRIORITY 300
+    WHEN keyword("code_tool_task")
+    REQUIRES ["chat", "code", "tool_calling"]
+    BUDGET { currency: "USD", max_estimated_cost: 0.03, output_token_bound: 3072, reasoning_token_bound: 0, require_pricing: true, require_current_pricing: true }
+    MODEL "niffy-general" (reasoning = false)
+    ALGORITHM static
+    PLUGIN router_replay {
+      enabled: true
+      max_records: 1000
+      capture_request_body: false
+      capture_response_body: false
+    }
+  }
+
+  ROUTE code-general-route (description = "Route ordinary implementation and refactoring to the general coding tier.") {
+    PRIORITY 200
+    WHEN keyword("code_general_task")
+    REQUIRES ["chat", "code"]
+    BUDGET { currency: "USD", max_estimated_cost: 0.03, output_token_bound: 3072, reasoning_token_bound: 0, require_pricing: true, require_current_pricing: true }
+    MODEL "niffy-general" (reasoning = false)
+    ALGORITHM static
+    PLUGIN router_replay {
+      enabled: true
+      max_records: 1000
+      capture_request_body: false
+      capture_response_body: false
+    }
+  }
+
+  ROUTE code-economical-route (description = "Handle simple explanations and bounded code transformations economically.") {
+    PRIORITY 100
+    REQUIRES ["chat", "code"]
+    BUDGET { currency: "USD", max_estimated_cost: 0.01, output_token_bound: 1536, reasoning_token_bound: 0, require_pricing: true, require_current_pricing: true }
+    MODEL "niffy-cheap" (reasoning = false)
+    ALGORITHM static
+    PLUGIN router_replay {
+      enabled: true
+      max_records: 1000
+      capture_request_body: false
+      capture_response_body: false
+    }
   }
 }

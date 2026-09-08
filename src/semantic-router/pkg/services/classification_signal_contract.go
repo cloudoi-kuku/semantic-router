@@ -32,20 +32,22 @@ func (s *ClassificationService) ClassifyIntentForEval(req IntentRequest) (*EvalR
 	}
 
 	wantTrace := req.Options != nil && req.Options.Trace
-	signals := classifier.EvaluateAllSignalsWithRequestFacts(
-		input.evaluationText,
-		input.contextText,
-		input.currentUserText,
-		input.priorUserMessages,
-		input.nonUserMessages,
-		input.hasAssistantReply,
-		true,
-		"",
-		nil,
-		input.conversationFacts,
-		input.imageURL,
-		input.requestFacts,
-	)
+	signals, err := classifier.EvaluateAllSignalsWithHeaders(classification.SignalEvaluationInput{
+		Text:                   input.evaluationText,
+		ContextText:            input.contextText,
+		CurrentUserText:        input.currentUserText,
+		PriorUserMessages:      input.priorUserMessages,
+		NonUserMessages:        input.nonUserMessages,
+		HasPriorAssistantReply: input.hasAssistantReply,
+		Headers:                req.Headers,
+		ForceEvaluateAll:       true,
+		ConversationFacts:      input.conversationFacts,
+		ImageURL:               input.imageURL,
+		RequestFacts:           input.requestFacts,
+	})
+	if err != nil {
+		return nil, err
+	}
 
 	var decisionResult *decision.DecisionResult
 	var traces []decision.DecisionTrace

@@ -192,20 +192,22 @@ func (s *ClassificationService) ClassifyIntent(req IntentRequest) (*IntentRespon
 	// Use signal-driven architecture: evaluate all signals first
 	// Check if we should force evaluate all signals (for eval scenarios)
 	forceEvaluateAll := req.Options != nil && req.Options.EvaluateAllSignals
-	signals := classifier.EvaluateAllSignalsWithRequestFacts(
-		input.evaluationText,
-		input.contextText,
-		input.currentUserText,
-		input.priorUserMessages,
-		input.nonUserMessages,
-		input.hasAssistantReply,
-		forceEvaluateAll,
-		"",
-		nil,
-		input.conversationFacts,
-		input.imageURL,
-		input.requestFacts,
-	)
+	signals, err := classifier.EvaluateAllSignalsWithHeaders(classification.SignalEvaluationInput{
+		Text:                   input.evaluationText,
+		ContextText:            input.contextText,
+		CurrentUserText:        input.currentUserText,
+		PriorUserMessages:      input.priorUserMessages,
+		NonUserMessages:        input.nonUserMessages,
+		HasPriorAssistantReply: input.hasAssistantReply,
+		Headers:                req.Headers,
+		ForceEvaluateAll:       forceEvaluateAll,
+		ConversationFacts:      input.conversationFacts,
+		ImageURL:               input.imageURL,
+		RequestFacts:           input.requestFacts,
+	})
+	if err != nil {
+		return nil, err
+	}
 
 	// Evaluate decision with engine (if decisions are configured)
 	// Pass pre-computed signals to avoid re-evaluation

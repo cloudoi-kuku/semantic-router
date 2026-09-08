@@ -264,7 +264,7 @@ classifier-family error behavior.
 
 `required_capabilities` filters `modelRefs` before any selection algorithm
 ranks them. Values use the provider-neutral
-`vllm-sr/model-capability-catalog/v1alpha1` vocabulary: `chat`, `text`,
+`vllm-sr/model-capability-catalog/v1alpha1` vocabulary: `chat`, `text`, `code`,
 `reasoning`, `tool_calling`, `parallel_tool_calling`, `structured_output`,
 `json_schema`, `vision`, `audio`, `video`, `file`, `embeddings`, and
 `image_generation`. Model cards may carry additional

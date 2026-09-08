@@ -26,11 +26,17 @@ def evaluate_probe(
     allowed_decisions: frozenset[str] | None = None,
     http_client: Callable[..., tuple[int, Any]] = http_json,
 ) -> dict[str, Any]:
+    request_args: dict[str, Any] = {"timeout_seconds": request_timeout_seconds}
+    if probe.trusted_user_id:
+        request_args["extra_headers"] = {
+            "x-authz-user-id": probe.trusted_user_id,
+            "x-authz-user-groups": ",".join(probe.trusted_groups),
+        }
     status, payload = http_client(
         "POST",
         f"{normalize_router_url(router_url)}/api/v1/eval?trace=true",
         _build_request_payload(probe),
-        timeout_seconds=request_timeout_seconds,
+        **request_args,
     )
     data = ensure_success(status, payload, "POST /api/v1/eval")
     if not isinstance(data, dict):
@@ -55,6 +61,8 @@ def _build_request_payload(
         payload["tools"] = list(probe.tools)
     if probe.tool_choice is not None:
         payload["tool_choice"] = copy.deepcopy(probe.tool_choice)
+    if probe.routing_metadata:
+        payload["metadata"] = dict(probe.routing_metadata)
     request_value = payload["messages"] if probe.messages else payload["text"]
     value_limit = _request_value_byte_limit(
         probe.probe_id,

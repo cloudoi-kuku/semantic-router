@@ -9,9 +9,15 @@ import (
 
 func TestValidateDecisionCapabilityContracts(t *testing.T) {
 	cfg := &RouterConfig{BackendModels: BackendModels{ModelConfig: map[string]ModelParams{
-		"general":   {Capabilities: []string{"chat", "tool_calling"}},
+		"general":   {Capabilities: []string{"chat", "code", "tool_calling"}},
 		"reasoning": {Capabilities: []string{"chat", "reasoning"}},
 	}}}
+
+	require.NoError(t, validateDecisionCapabilityContracts(cfg, Decision{
+		Name:                 "code-route",
+		RequiredCapabilities: []string{"chat", "code"},
+		ModelRefs:            []ModelRef{{Model: "general"}},
+	}))
 
 	require.NoError(t, validateDecisionCapabilityContracts(cfg, Decision{
 		Name:                 "reasoning-route",

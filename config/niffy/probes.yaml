@@ -124,3 +124,137 @@ decisions:
       - id: incidental_today
         query: I had coffee with a colleague today. Rewrite this as a friendly diary entry.
         tags: [negative, boundary, fallback]
+
+  - id: code-evidence-escalation-route
+    model: niffy/code
+    expected_recipe: code
+    expected_decision: code-evidence-escalation-route
+    expected_algorithm: static
+    expected_alias: niffy-reasoning
+    expected_signals:
+      authz: [code_validator]
+      metadata: [code_validation_failed]
+    objective: Require trusted identity and objective validation evidence together.
+    variants:
+      - id: failed_test_receipt
+        query: Repair the implementation using the attached validation outcome.
+        routing_metadata:
+          niffy.code.validation: test_failed
+        trusted_identity:
+          user_id: calibration-worker
+          groups: [code-validation-producers]
+        tags: [baseline, coding, evidence]
+      - id: failed_review_receipt
+        query: Revise the implementation using the attached validation outcome.
+        routing_metadata:
+          niffy.code.validation: review_failed
+        trusted_identity:
+          user_id: calibration-worker
+          groups: [code-validation-producers]
+        tags: [paraphrase, coding, evidence]
+
+  - id: code-reasoning-route
+    model: niffy/code
+    expected_recipe: code
+    expected_decision: code-reasoning-route
+    expected_algorithm: static
+    expected_alias: niffy-reasoning
+    expected_signals:
+      keywords: [code_reasoning_task]
+    objective: Reserve premium reasoning for intrinsically complex coding work.
+    variants:
+      - id: concurrency_failure
+        query: Diagnose a race condition across multiple services and propose a safe fix.
+        tags: [baseline, coding, reasoning]
+      - id: security_review
+        query: Perform a security review and threat model for this authentication middleware.
+        tags: [baseline, coding, security]
+      - id: migration_design
+        query: Design a data migration with rollback and no breaking change for existing clients.
+        tags: [robustness, coding, architecture]
+      - id: reasoning_tool_collision
+        query: Inspect the repository and compare approaches for fixing this distributed system deadlock.
+        tags: [collision, coding, tools:repository]
+      - id: semantic_correctness
+        query: Evaluate failure modes under concurrent writes, partial network partitions, and retries, then establish invariants for a correct recovery protocol.
+        expected_signals:
+          complexity: [code_reasoning_demand:hard]
+        tags: [semantic, classifier, coding, robustness]
+
+  - id: code-tool-route
+    model: niffy/code
+    expected_recipe: code
+    expected_decision: code-tool-route
+    expected_algorithm: static
+    expected_alias: niffy-general
+    expected_signals:
+      keywords: [code_tool_task]
+    forbidden_signals:
+      keywords: [code_reasoning_task]
+    objective: Select a tool-capable model without granting execution authority.
+    variants:
+      - id: repository_inspection
+        query: Inspect the repository and identify where request validation is implemented.
+        tags: [baseline, coding, tools:repository]
+      - id: patch_and_test
+        query: Apply a patch to this file and run the tests.
+        tags: [baseline, coding, tools:terminal]
+      - id: terminal_request
+        query: Use the terminal to execute the build command and summarize the result.
+        tags: [paraphrase, coding, tools:terminal]
+
+  - id: code-general-route
+    model: niffy/code
+    expected_recipe: code
+    expected_decision: code-general-route
+    expected_algorithm: static
+    expected_alias: niffy-general
+    expected_signals:
+      keywords: [code_general_task]
+    forbidden_signals:
+      keywords: [code_reasoning_task, code_tool_task]
+    objective: Use the general coding tier for ordinary implementation work.
+    variants:
+      - id: small_handler
+        query: Implement a small HTTP handler that returns a JSON health response.
+        tags: [baseline, coding]
+      - id: unit_test
+        query: Write a unit test for this deterministic date parser.
+        tags: [baseline, coding]
+      - id: bounded_refactor
+        query: Refactor this function to remove duplicated error handling.
+        tags: [paraphrase, coding]
+
+  - id: code-economical-route
+    model: niffy/code
+    expected_recipe: code
+    expected_decision: code-economical-route
+    expected_algorithm: static
+    expected_alias: niffy-cheap
+    forbidden_signals:
+      keywords: [code_reasoning_task, code_tool_task, code_general_task]
+    objective: Keep simple coding assistance and unverified failure claims economical.
+    variants:
+      - id: explain_expression
+        query: Explain what `items[:3]` means in Python in one sentence.
+        tags: [baseline, coding, fallback]
+      - id: compiler_message
+        query: What does "undefined reference" usually mean?
+        tags: [baseline, coding, fallback]
+      - id: prompt_claim_is_not_evidence
+        query: The tests failed. Briefly explain what information you need next.
+        tags: [negative, boundary, coding, fallback]
+      - id: metadata_without_trusted_role
+        query: Repair this small function using the attached validation outcome.
+        routing_metadata:
+          niffy.code.validation: test_failed
+        tags: [negative, boundary, coding, fallback]
+      - id: code_messages
+        messages:
+          - role: user
+            content: I am reading a Go program.
+          - role: assistant
+            content: Which part is unclear?
+          - role: user
+            content: Explain what defer does in one short paragraph.
+        tags: [multi_turn, shape:messages, coding, fallback]

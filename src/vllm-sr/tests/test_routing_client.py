@@ -1,7 +1,6 @@
 from unittest.mock import Mock
 
 import pytest
-
 from vllm_sr import (
     ROUTING_DECISION_SCHEMA_V1,
     RoutingAPIError,

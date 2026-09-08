@@ -71,6 +71,8 @@ VARIANT_FIELDS = frozenset(
         "messages",
         "tools",
         "tool_choice",
+        "routing_metadata",
+        "trusted_identity",
         "repeat",
         "padding",
         "generated_text",
@@ -146,6 +148,9 @@ class Probe:
     messages: tuple[dict[str, Any], ...] = ()
     tools: tuple[dict[str, Any], ...] = ()
     tool_choice: str | dict[str, Any] | None = None
+    routing_metadata: dict[str, str] = field(default_factory=dict)
+    trusted_user_id: str | None = None
+    trusted_groups: tuple[str, ...] = ()
     expected_alias: str | None = None
     notes: str | None = None
     tags: tuple[str, ...] = ()
@@ -338,11 +343,40 @@ def _load_variant(
         messages=messages,
         tools=_normalize_objects(raw_variant.get("tools"), "tools"),
         tool_choice=_normalize_tool_choice(raw_variant.get("tool_choice"), probe_id),
+        routing_metadata=_normalize_routing_metadata(
+            raw_variant.get("routing_metadata"), probe_id
+        ),
+        **_normalize_trusted_identity(raw_variant.get("trusted_identity"), probe_id),
         expected_alias=defaults.expected_alias,
         notes=_optional_string(raw_variant.get("notes")) or defaults.notes,
         tags=_normalize_tags(raw_variant.get("tags")),
         image_fixtures=image_fixtures,
     )
+
+
+def _normalize_routing_metadata(raw: Any, probe_id: str) -> dict[str, str]:
+    if raw is None:
+        return {}
+    if not isinstance(raw, dict):
+        raise TypeError(f"{probe_id}.routing_metadata must be a mapping")
+    return {str(key): str(value) for key, value in raw.items()}
+
+
+def _normalize_trusted_identity(raw: Any, probe_id: str) -> dict[str, Any]:
+    if raw is None:
+        return {"trusted_user_id": None, "trusted_groups": ()}
+    if not isinstance(raw, dict):
+        raise TypeError(f"{probe_id}.trusted_identity must be a mapping")
+    user_id = str(raw.get("user_id") or "").strip()
+    groups = raw.get("groups")
+    if not user_id or not isinstance(groups, list):
+        raise ValueError(
+            f"{probe_id}.trusted_identity requires user_id and a groups list"
+        )
+    return {
+        "trusted_user_id": user_id,
+        "trusted_groups": tuple(str(group).strip() for group in groups),
+    }
 
 
 def normalize_image_fixtures(

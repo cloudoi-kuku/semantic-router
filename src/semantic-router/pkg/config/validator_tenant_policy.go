@@ -13,29 +13,8 @@ func validateTenantPolicyContracts(cfg *RouterConfig) error {
 	if !policy.Enabled {
 		return nil
 	}
-	if strings.TrimSpace(policy.Version) == "" {
-		return fmt.Errorf("global.services.tenant_policy.version is required when tenant policy is enabled")
-	}
-	if strings.TrimSpace(policy.GetTenantIDHeader()) == "" {
-		return fmt.Errorf("global.services.tenant_policy.tenant_id_header cannot be empty")
-	}
-	if policy.RequireCurrentPricing && !policy.RequirePricing {
-		return fmt.Errorf("global.services.tenant_policy.require_current_pricing requires require_pricing")
-	}
-	if tenantPolicyHasCostCap(policy) {
-		currency := strings.TrimSpace(policy.Currency)
-		if len(currency) != 3 || currency != strings.ToUpper(currency) {
-			return fmt.Errorf("global.services.tenant_policy.currency must be a three-letter currency code when a cost cap is configured")
-		}
-		if !policy.RequirePricing {
-			return fmt.Errorf("global.services.tenant_policy.require_pricing must be true when a cost cap is configured")
-		}
-		if policy.OutputTokenBound <= 0 {
-			return fmt.Errorf("global.services.tenant_policy.output_token_bound must be greater than zero when a cost cap is configured")
-		}
-		if policy.ReasoningTokenBound < 0 {
-			return fmt.Errorf("global.services.tenant_policy.reasoning_token_bound cannot be negative")
-		}
+	if err := validateTenantPolicySettings(policy); err != nil {
+		return err
 	}
 	if err := validateTenantRoutingPolicy(cfg, "default", policy.Default); err != nil {
 		return err
@@ -47,6 +26,39 @@ func validateTenantPolicyContracts(cfg *RouterConfig) error {
 		if err := validateTenantRoutingPolicy(cfg, "tenants."+tenantID, tenant); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+func validateTenantPolicySettings(policy TenantPolicyConfig) error {
+	if strings.TrimSpace(policy.Version) == "" {
+		return fmt.Errorf("global.services.tenant_policy.version is required when tenant policy is enabled")
+	}
+	if strings.TrimSpace(policy.GetTenantIDHeader()) == "" {
+		return fmt.Errorf("global.services.tenant_policy.tenant_id_header cannot be empty")
+	}
+	if policy.RequireCurrentPricing && !policy.RequirePricing {
+		return fmt.Errorf("global.services.tenant_policy.require_current_pricing requires require_pricing")
+	}
+	if !tenantPolicyHasCostCap(policy) {
+		return nil
+	}
+	return validateTenantCostCapSettings(policy)
+}
+
+func validateTenantCostCapSettings(policy TenantPolicyConfig) error {
+	currency := strings.TrimSpace(policy.Currency)
+	if len(currency) != 3 || currency != strings.ToUpper(currency) {
+		return fmt.Errorf("global.services.tenant_policy.currency must be a three-letter currency code when a cost cap is configured")
+	}
+	if !policy.RequirePricing {
+		return fmt.Errorf("global.services.tenant_policy.require_pricing must be true when a cost cap is configured")
+	}
+	if policy.OutputTokenBound <= 0 {
+		return fmt.Errorf("global.services.tenant_policy.output_token_bound must be greater than zero when a cost cap is configured")
+	}
+	if policy.ReasoningTokenBound < 0 {
+		return fmt.Errorf("global.services.tenant_policy.reasoning_token_bound cannot be negative")
 	}
 	return nil
 }

@@ -458,6 +458,44 @@ decisions:
             timeout_seconds=60.0,
         )
 
+    def test_evaluate_probe_sends_declared_identity_and_metadata(self) -> None:
+        probe = router_calibration_manifest.Probe(
+            decision_id="evidence",
+            variant_id="test-failed",
+            probe_id="evidence:test-failed",
+            expected_decision="premium-retry",
+            model="niffy/code",
+            expected_recipe="code",
+            query="Repair the failed change.",
+            routing_metadata={"niffy.code.validation": "test_failed"},
+            trusted_user_id="calibration-worker",
+            trusted_groups=("code-validation-producers",),
+        )
+        response = {
+            "requested_model": "niffy/code",
+            "recipe": "code",
+            "routing_decision": "premium-retry",
+            "decision_result": {"decision_name": "premium-retry"},
+        }
+        with mock.patch.object(
+            router_calibration_support, "http_json", return_value=(200, response)
+        ) as http_json:
+            router_calibration_support.evaluate_probe("http://router.example", probe)
+        http_json.assert_called_once_with(
+            "POST",
+            "http://router.example/api/v1/eval?trace=true",
+            {
+                "text": "Repair the failed change.",
+                "model": "niffy/code",
+                "metadata": {"niffy.code.validation": "test_failed"},
+            },
+            timeout_seconds=60.0,
+            extra_headers={
+                "x-authz-user-id": "calibration-worker",
+                "x-authz-user-groups": "code-validation-producers",
+            },
+        )
+
     def test_evaluate_probe_rejects_missing_signal_or_plugin(self) -> None:
         probe = router_calibration_manifest.Probe(
             decision_id="privacy",

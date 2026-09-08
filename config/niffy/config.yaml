@@ -10,6 +10,23 @@ listeners:
 
 global:
   services:
+    # Coding escalation requires both caller-supplied validation metadata and
+    # this trusted role. Anonymous requests continue normally but can never
+    # match the evidence-driven premium route.
+    authz:
+      fail_open: true
+      identity:
+        user_id_header: x-authz-user-id
+        user_groups_header: x-authz-user-groups
+    # Split topology requires a container-network wildcard bind. The launcher
+    # publishes it on host loopback only while remote_exposure remains false.
+    # Production exposure requires bearer auth and a private control plane.
+    management_api:
+      bind_address: 0.0.0.0
+      port: 8080
+      remote_exposure: false
+      auth:
+        mode: disabled
     router_replay:
       enabled: true
       store_backend: redis
@@ -159,17 +176,17 @@ routing:
   modelCards:
     - name: niffy-cheap
       description: Economical default for direct questions, summaries, and routine chat.
-      capabilities: [chat, text, summarization]
+      capabilities: [chat, text, summarization, code]
       modality: text
       tags: [provider:mistral, tier:cheap]
     - name: niffy-general
       description: General model selected when a request indicates live-search or tool intent.
-      capabilities: [chat, text, tool_calling]
+      capabilities: [chat, text, code, tool_calling]
       modality: text
       tags: [provider:xai, tier:general]
     - name: niffy-reasoning
       description: Higher-cost model reserved for complex analysis and reasoning.
-      capabilities: [chat, text, reasoning, code]
+      capabilities: [chat, text, reasoning, code, tool_calling]
       modality: text
       tags: [provider:openai, tier:reasoning]
 
@@ -349,3 +366,248 @@ routing:
             max_records: 1000
             capture_request_body: false
             capture_response_body: false
+
+entrypoints:
+  - model_names: [niffy/code]
+    recipe: code
+
+recipes:
+  - name: code
+    description: >-
+      Provider-neutral coding policy with evidence-gated premium escalation.
+      Tool execution remains the responsibility of an authorized caller.
+    routing:
+      strategy: priority
+      signals:
+        keywords:
+          - name: code_tool_task
+            operator: OR
+            case_sensitive: false
+            keywords:
+              - edit the file
+              - modify the code
+              - apply a patch
+              - inspect the repository
+              - search the codebase
+              - run the tests
+              - run the build
+              - execute the command
+              - use the terminal
+              - use mcp
+              - call a tool
+          - name: code_general_task
+            operator: OR
+            case_sensitive: false
+            keywords:
+              - implement
+              - write code
+              - generate code
+              - fix this bug
+              - refactor
+              - add unit tests
+              - write a unit test
+              - write a test
+              - create a function
+              - add an endpoint
+              - update this class
+          - name: code_reasoning_task
+            operator: OR
+            case_sensitive: false
+            keywords:
+              - architecture
+              - security review
+              - threat model
+              - race condition
+              - deadlock
+              - distributed system
+              - root cause
+              - data migration
+              - breaking change
+              - compare approaches
+              - prove correctness
+              - multiple services
+        complexity:
+          - name: code_reasoning_demand
+            threshold: 0.20
+            description: Calibrated local prototype margin for complex coding work.
+            hard:
+              candidates:
+                - diagnose an intermittent concurrency failure across several components
+                - design a secure migration while preserving compatibility and rollback
+                - compare implementation architectures and justify their tradeoffs
+                - reason about correctness across multiple files and services
+            easy:
+              candidates:
+                - explain one short code fragment
+                - rename a variable in one function
+                - write a small deterministic helper
+                - summarize a compiler error briefly
+        context:
+          - name: code_large_context
+            min_tokens: 12K
+            max_tokens: 262K
+            description: Large repository or multi-file context that needs stronger synthesis.
+        metadata:
+          - name: code_validation_failed
+            description: Objective patch, build, test, or review evidence reported a failure.
+            key: niffy.code.validation
+            predicate:
+              in: [patch_failed, build_failed, test_failed, review_failed]
+        role_bindings:
+          - name: code_validator
+            description: Trusted coding orchestrators allowed to submit validation outcomes.
+            role: code_validator
+            subjects:
+              - kind: Group
+                name: code-validation-producers
+      decisions:
+        - name: code-evidence-escalation-route
+          description: >-
+            Escalate only when a trusted orchestrator reports objective validation failure.
+          priority: 500
+          required_capabilities: [chat, code, reasoning]
+          request_budget:
+            currency: USD
+            max_estimated_cost: 0.25
+            output_token_bound: 4096
+            reasoning_token_bound: 4096
+            require_pricing: true
+            require_current_pricing: true
+          rules:
+            operator: AND
+            conditions:
+              - type: authz
+                name: code_validator
+              - type: metadata
+                name: code_validation_failed
+          modelRefs:
+            - model: niffy-reasoning
+              use_reasoning: true
+              reasoning_effort: medium
+          algorithm:
+            type: static
+          plugins:
+            - type: router_replay
+              configuration:
+                enabled: true
+                max_records: 1000
+                capture_request_body: false
+                capture_response_body: false
+
+        - name: code-reasoning-route
+          description: Route intrinsically complex coding work to the reasoning tier.
+          priority: 400
+          required_capabilities: [chat, code, reasoning]
+          request_budget:
+            currency: USD
+            max_estimated_cost: 0.25
+            output_token_bound: 4096
+            reasoning_token_bound: 4096
+            require_pricing: true
+            require_current_pricing: true
+          rules:
+            operator: OR
+            conditions:
+              - type: keyword
+                name: code_reasoning_task
+              - type: complexity
+                name: code_reasoning_demand:hard
+              - type: context
+                name: code_large_context
+          modelRefs:
+            - model: niffy-reasoning
+              use_reasoning: true
+              reasoning_effort: medium
+          algorithm:
+            type: static
+          plugins:
+            - type: router_replay
+              configuration:
+                enabled: true
+                max_records: 1000
+                capture_request_body: false
+                capture_response_body: false
+
+        - name: code-tool-route
+          description: >-
+            Select a tool-capable coding model; the caller remains responsible
+            for authorizing and executing repository or terminal operations.
+          priority: 300
+          required_capabilities: [chat, code, tool_calling]
+          request_budget:
+            currency: USD
+            max_estimated_cost: 0.03
+            output_token_bound: 3072
+            require_pricing: true
+            require_current_pricing: true
+          rules:
+            operator: AND
+            conditions:
+              - type: keyword
+                name: code_tool_task
+          modelRefs:
+            - model: niffy-general
+              use_reasoning: false
+          algorithm:
+            type: static
+          plugins:
+            - type: router_replay
+              configuration:
+                enabled: true
+                max_records: 1000
+                capture_request_body: false
+                capture_response_body: false
+
+        - name: code-general-route
+          description: Route ordinary implementation and refactoring to the general coding tier.
+          priority: 200
+          required_capabilities: [chat, code]
+          request_budget:
+            currency: USD
+            max_estimated_cost: 0.03
+            output_token_bound: 3072
+            require_pricing: true
+            require_current_pricing: true
+          rules:
+            operator: AND
+            conditions:
+              - type: keyword
+                name: code_general_task
+          modelRefs:
+            - model: niffy-general
+              use_reasoning: false
+          algorithm:
+            type: static
+          plugins:
+            - type: router_replay
+              configuration:
+                enabled: true
+                max_records: 1000
+                capture_request_body: false
+                capture_response_body: false
+
+        - name: code-economical-route
+          description: Handle simple explanations and bounded code transformations economically.
+          priority: 100
+          required_capabilities: [chat, code]
+          request_budget:
+            currency: USD
+            max_estimated_cost: 0.01
+            output_token_bound: 1536
+            require_pricing: true
+            require_current_pricing: true
+          rules:
+            operator: AND
+            conditions: []
+          modelRefs:
+            - model: niffy-cheap
+              use_reasoning: false
+          algorithm:
+            type: static
+          plugins:
+            - type: router_replay
+              configuration:
+                enabled: true
+                max_records: 1000
+                capture_request_body: false
+                capture_response_body: false

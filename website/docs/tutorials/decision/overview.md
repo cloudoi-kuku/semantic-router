@@ -70,7 +70,8 @@ Decision matching stays separate from:
 - `decision.plugins`, which post-processes a matched route
 
 After a decision matches, `required_capabilities` removes models that do not
-advertise every required capability in `routing.modelCards`. This hard gate
+advertise every required capability in `routing.modelCards`. `code` is the
+provider-neutral hard requirement for coding profiles. This hard gate
 runs before an algorithm ranks the remaining candidates. In DSL, the same
 contract is `REQUIRES ["chat", "reasoning"]`. Omit it when a route has no hard
 capability requirement.

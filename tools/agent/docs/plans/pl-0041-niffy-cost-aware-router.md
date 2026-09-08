@@ -70,11 +70,23 @@ workflow decisions.
   privacy-safe tenant model/provider/cost policy in live and dry-run routing,
   ship a schema-checking Python client, and move the Niffy replay/startup state
   to Redis-backed development persistence.
+- [x] `NIFFY-11` Package the extended router and dashboard as immutable,
+  versioned images; record content-addressed image and config evidence; provide
+  a no-pull verified startup command; and pass clean-start, restart-persistence,
+  rollback, security-boundary, and full feature-gate validation.
+- [x] `NIFFY-12` Define and calibrate a product-independent `niffy/code`
+  profile that classifies coding intent, complexity, context and tool needs;
+  routes among economical, general, and reasoning coding tiers; and escalates
+  only from objective patch, build, test, or review evidence.
+- [ ] `NIFFY-13` Run a bounded coding canary across all three configured
+  providers, collect real `niffy/code-evaluation/v1` outcome ledgers, and tune
+  routing thresholds against validated quality, latency, and cost evidence.
 
 ## Next Action
 
-Run the full NIFFY-10 feature gate and live compatibility matrix, then prepare
-the completed product-independent router changes for review.
+Restore valid xAI credentials and Mistral quota, then run the NIFFY-13 bounded
+coding canary and promote thresholds only if the real outcome ledger passes the
+cost-per-validated-outcome gate.
 
 ## Operating Rules
 

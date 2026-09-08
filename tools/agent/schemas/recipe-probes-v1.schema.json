@@ -257,6 +257,26 @@
             {"type": "object", "minProperties": 1}
           ]
         },
+        "routing_metadata": {
+          "type": "object",
+          "maxProperties": 32,
+          "propertyNames": {"minLength": 1, "maxLength": 128},
+          "additionalProperties": {"type": "string", "maxLength": 1024}
+        },
+        "trusted_identity": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["user_id", "groups"],
+          "properties": {
+            "user_id": {"type": "string", "minLength": 1, "maxLength": 256},
+            "groups": {
+              "type": "array",
+              "uniqueItems": true,
+              "maxItems": 32,
+              "items": {"type": "string", "minLength": 1, "maxLength": 256}
+            }
+          }
+        },
         "repeat": {"type": "integer", "minimum": 1, "maximum": 10000},
         "padding": {"$ref": "#/$defs/padding"},
         "generated_text": {"$ref": "#/$defs/generatedText"},

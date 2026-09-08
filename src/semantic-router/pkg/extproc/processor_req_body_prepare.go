@@ -50,26 +50,16 @@ func (r *OpenAIRouter) runRequestPreRoutingStages(
 			return requestDecisionState{}, r.createErrorResponse(422, policyErr.Error())
 		}
 	}
-	decisionName, _, reasoningDecision, selectedModel, decisionErr := r.performDecisionEvaluation(
+	state, response := r.resolveRequestDecision(
 		originalModel,
 		history,
 		ctx,
 	)
-	if decisionErr != nil {
-		if errors.Is(decisionErr, context.Canceled) ||
-			errors.Is(decisionErr, context.DeadlineExceeded) {
-			return requestDecisionState{}, r.createErrorResponse(499, "request canceled")
-		}
-		if errors.Is(decisionErr, errNoContextEligibleDecisionModel) {
-			logging.Warnf("[Request Body] Decision candidates failed request eligibility: %v", decisionErr)
-			return requestDecisionState{}, r.createErrorResponse(422, decisionErr.Error())
-		}
-		logging.Errorf("[Request Body] Decision evaluation failed: %v", decisionErr)
-		if errors.Is(decisionErr, decision.ErrDecisionUnresolved) {
-			return requestDecisionState{}, r.respondDecisionUnresolved(ctx, originalModel, decisionErr)
-		}
-		return requestDecisionState{}, r.createErrorResponse(403, decisionErr.Error())
+	if response != nil {
+		return requestDecisionState{}, response
 	}
+	decisionName := state.decisionName
+	selectedModel := state.selectedModel
 	metrics.RecordModelRequest(selectedModel)
 	ctx.InflightToken = inflight.Begin(selectedModel)
 	if resp := r.handleFastResponse(ctx, decisionName); resp != nil {
@@ -102,11 +92,38 @@ func (r *OpenAIRouter) runRequestPreRoutingStages(
 		return requestDecisionState{}, r.createErrorResponse(503, fmt.Sprintf("RAG retrieval failed: %v", ragErr))
 	}
 
-	return requestDecisionState{
-		decisionName:      decisionName,
-		reasoningDecision: reasoningDecision,
-		selectedModel:     selectedModel,
-	}, nil
+	return state, nil
+}
+
+func (r *OpenAIRouter) resolveRequestDecision(
+	originalModel string,
+	history signalConversationHistory,
+	ctx *RequestContext,
+) (requestDecisionState, *ext_proc.ProcessingResponse) {
+	decisionName, _, reasoningDecision, selectedModel, err := r.performDecisionEvaluation(
+		originalModel,
+		history,
+		ctx,
+	)
+	if err == nil {
+		return requestDecisionState{
+			decisionName:      decisionName,
+			reasoningDecision: reasoningDecision,
+			selectedModel:     selectedModel,
+		}, nil
+	}
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return requestDecisionState{}, r.createErrorResponse(499, "request canceled")
+	}
+	if errors.Is(err, errNoContextEligibleDecisionModel) {
+		logging.Warnf("[Request Body] Decision candidates failed request eligibility: %v", err)
+		return requestDecisionState{}, r.createErrorResponse(422, err.Error())
+	}
+	logging.Errorf("[Request Body] Decision evaluation failed: %v", err)
+	if errors.Is(err, decision.ErrDecisionUnresolved) {
+		return requestDecisionState{}, r.respondDecisionUnresolved(ctx, originalModel, err)
+	}
+	return requestDecisionState{}, r.createErrorResponse(403, err.Error())
 }
 
 func endRequestInflight(ctx *RequestContext, selectedModel string) {
