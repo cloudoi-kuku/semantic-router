@@ -47,7 +47,7 @@ Repository = "https://github.com/vllm-project/vllm-semantic-router"
 Issues = "https://github.com/vllm-project/vllm-semantic-router/issues"
 
 [tool.setuptools]
-packages = ["cli", "cli.commands", "cli.templates", "cli.model_assets", "cli.evaluation"]
+packages = ["cli", "cli.commands", "cli.templates", "cli.model_assets", "cli.evaluation", "vllm_sr"]
 include-package-data = false
 
 [tool.setuptools.package-data]

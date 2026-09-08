@@ -46,8 +46,15 @@ func assertReferenceConfigServiceGlobalCoverage(t testingT, services map[string]
 	assertReferenceConfigObservabilityCoverage(t, mustMapAt(t, services, "observability"))
 	assertReferenceConfigAuthzCoverage(t, mustMapAt(t, services, "authz"))
 	assertReferenceConfigRateLimitCoverage(t, mustMapAt(t, services, "ratelimit"))
+	assertReferenceConfigTenantPolicyCoverage(t, mustMapAt(t, services, "tenant_policy"))
 	assertReferenceConfigManagementAPICoverage(t, mustMapAt(t, services, "management_api"))
 	assertReferenceConfigRouterReplayCoverage(t, mustMapAt(t, services, "router_replay"))
+}
+
+func assertReferenceConfigTenantPolicyCoverage(t testingT, tenantPolicy map[string]interface{}) {
+	assertMapCoversStructFields(t, tenantPolicy, reflect.TypeOf(TenantPolicyConfig{}), "global.services.tenant_policy")
+	assertMapCoversStructFields(t, mustMapAt(t, tenantPolicy, "default"), reflect.TypeOf(TenantRoutingPolicy{}), "global.services.tenant_policy.default")
+	assertMapCoversStructFields(t, mustMapAt(t, tenantPolicy, "tenants", "restricted"), reflect.TypeOf(TenantRoutingPolicy{}), "global.services.tenant_policy.tenants.restricted")
 }
 
 func assertReferenceConfigManagementAPICoverage(t testingT, managementAPI map[string]interface{}) {

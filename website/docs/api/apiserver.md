@@ -86,6 +86,7 @@ curl -sS http://localhost:8080/api/v1/classify/intent \
 | `POST` | `/api/v1/classify/batch` | Run a selected classifier over a batch |
 | `POST` | `/api/v1/eval` | Evaluate all configured signals |
 | `POST` | `/api/v1/route/evaluate` | Preview the live routing decision without invoking a model or tool |
+| `POST` | `/v1/route/evaluate` | Stable product-facing routing decision (`vllm-sr/routing-decision/v1`) |
 | `POST` | `/api/v1/nli` | Evaluate a premise/hypothesis pair |
 | `POST` | `/api/v1/embeddings` | Generate configured text or image embeddings |
 | `POST` | `/api/v1/similarity` | Compare a text pair |
@@ -93,6 +94,14 @@ curl -sS http://localhost:8080/api/v1/classify/intent \
 
 Names, scores, and matched rules depend on the active recipe. Use the live
 schema for each endpoint's supported input forms.
+
+The stable route endpoint accepts the same OpenAI-shaped `model`, `messages`,
+token-bound, and tool fields as the alpha endpoint. It never invokes a model or
+tool. When tenant policy is enabled, it reads identity only from the configured
+trusted tenant header and reports content-free policy evidence without echoing
+the tenant identifier. Keep `/api/v1/route/evaluate` for clients pinned to
+`vllm-sr/routing-decision/v1alpha1`; new clients should require
+`vllm-sr/routing-decision/v1` from `/v1/route/evaluate`.
 
 ## Inspect models and metrics
 

@@ -70,6 +70,16 @@ policy. Explicit request token ceilings replace the configured defaults for
 that request. `require_pricing` and `require_current_pricing` provide
 fail-closed behavior before an algorithm ranks the remaining candidates.
 
+`global.services.tenant_policy` adds router-wide, versioned tenant constraints
+without placing product logic in a recipe. An authenticating gateway strips
+caller-provided identity and injects the configured trusted header. Default and
+tenant-specific model/provider rules are applied before capability and economic
+selection; an optional maximum estimated cost tightens the decision budget and
+requires pricing. Provider-facing policy identity is carried by
+`provider:<vendor>` model-card tags and remains distinct from a backend's wire
+protocol. Routing evidence reports only policy status and effective constraints,
+never the tenant identifier.
+
 The optional decision-level `workflow` runs after routing, eligibility, budget,
 rate-limit, and cache checks but before synthesis. The first contract is
 `vllm-sr/workflow/v1alpha1` with `type: web_search_answer`. It requires an

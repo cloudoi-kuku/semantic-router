@@ -213,6 +213,7 @@ const sidebars: SidebarsConfig = {
           },
           items: [
             'tutorials/global/api-and-observability',
+            'tutorials/global/tenant-routing-policy',
             'tutorials/global/stores-and-tools',
             'tutorials/global/safety-models-and-policy',
             'tutorials/global/remote-embeddings',

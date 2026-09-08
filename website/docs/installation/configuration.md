@@ -50,6 +50,13 @@ Provider pricing belongs beside each concrete model under
 `cached_input_per_1m`, and `cache_write_per_1m` rates. Routing model cards do not
 repeat deployment prices or credentials.
 
+Tenant routing policy belongs under `global.services.tenant_policy`. It reads
+identity only from an operator-configured trusted header, applies model and
+provider allow/deny rules before selection, and can tighten a decision's
+per-request cost ceiling. A cost ceiling requires priced candidates so the
+router fails closed instead of treating unknown cost as free. See
+[Tenant Routing Policy](../tutorials/global/tenant-routing-policy).
+
 Router-wide debugging surfaces stay closed by default.
 `global.services.observability.profiling` serves Go `pprof` endpoints, and only
 when it is explicitly enabled; it then binds `127.0.0.1:6060` so profiles never

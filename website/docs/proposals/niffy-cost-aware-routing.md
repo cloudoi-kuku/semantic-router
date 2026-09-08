@@ -83,12 +83,13 @@ reason to choose a model marketed as having search capabilities.
 
 ## Versioned Decision Contract
 
-The first contract is exposed by `POST /api/v1/route/evaluate`. It performs no
+The stable contract is exposed by `POST /v1/route/evaluate`; the original
+`POST /api/v1/route/evaluate` path remains pinned to `v1alpha1`. It performs no
 provider generation and returns a privacy-minimized envelope:
 
 ```json
 {
-  "schema_version": "vllm-sr/routing-decision/v1alpha1",
+  "schema_version": "vllm-sr/routing-decision/v1",
   "dry_run": true,
   "route": {
     "recipe": "default",
@@ -317,6 +318,15 @@ call. Their thresholds, prototype text, contract version, and tagged probes are
 versioned inputs to calibration; tool intent retains higher priority than
 reasoning when both match.
 
+NIFFY-10 promotes the non-generating decision envelope to a stable v1 contract,
+adds a small Python client that rejects incompatible schemas, and enforces a
+versioned tenant policy before capability and cost ranking in both dry-run and
+live routing. Tenant rules can allow or deny logical models and providers and
+apply a stricter per-request cost ceiling. Identity is read only from a trusted
+header and is reduced to a boolean presence signal in public evidence. The
+Niffy profile also moves Router Replay and startup status to Redis so those
+records survive router-container restarts.
+
 ## Evaluation Strategy
 
 Development uses four complementary suites:
@@ -367,13 +377,11 @@ classifier, and evaluation version so results remain reproducible.
 7. **Adaptive routing (local classifiers implemented):** calibrated local
    classifiers retain deterministic overrides; online learning from
    privacy-safe outcomes remains future work.
-8. **Product contract:** stable SDK-facing API, tenant policy, compatibility,
-   and deployment hardening.
+8. **Product contract (implemented):** stable SDK-facing API, tenant policy,
+   compatibility aliasing, and Redis-backed development deployment hardening.
 
 ## Open Decisions
 
-- Whether the long-term public dry-run path remains under `/api/v1` or gains a
-  data-plane `/v1` alias.
 - Which automated review/update process should replace the initial pinned
   official provider sources before their configured expiry.
 - Whether workflow execution belongs in this process or a separately isolated

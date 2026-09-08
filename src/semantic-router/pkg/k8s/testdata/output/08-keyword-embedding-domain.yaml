@@ -162,6 +162,11 @@ global:
         enabled: false
     authz: {}
     ratelimit: {}
+    tenant_policy:
+      enabled: false
+      require_tenant: false
+      require_pricing: false
+      require_current_pricing: false
     management_api: {}
     router_replay:
       enabled: false

@@ -261,6 +261,19 @@ export const ROUTER_STRUCTURED_FIELDS: Partial<
       ),
     },
   },
+  tenant_policy: {
+    default: {
+      label: 'Default Tenant Policy',
+      description: 'Default provider/model restrictions and per-request cost ceiling.',
+      schema: object('Default Tenant Policy', {
+        allowed_models: stringList('Allowed Model'),
+        denied_models: stringList('Denied Model'),
+        allowed_providers: stringList('Allowed Provider'),
+        denied_providers: stringList('Denied Provider'),
+        max_estimated_cost: number('Maximum Estimated Cost', { min: 0 }),
+      }),
+    },
+  },
   ratelimit: {
     providers: {
       label: 'Rate Limit Providers',

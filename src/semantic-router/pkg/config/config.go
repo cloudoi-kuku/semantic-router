@@ -130,6 +130,7 @@ type RouterConfig struct {
 
 	Authz         AuthzConfig         `yaml:"authz,omitempty"`
 	RateLimit     RateLimitConfig     `yaml:"ratelimit,omitempty"`
+	TenantPolicy  TenantPolicyConfig  `yaml:"tenant_policy,omitempty"`
 	ManagementAPI ManagementAPIConfig `yaml:"management_api,omitempty"`
 
 	// Runtime-only knowledge bases loaded from global.model_catalog.

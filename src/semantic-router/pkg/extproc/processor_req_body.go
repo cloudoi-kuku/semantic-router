@@ -256,6 +256,9 @@ func (r *OpenAIRouter) handleSpecifiedModelRouting(request *llmprotocol.Request,
 		"request_id": ctx.RequestID,
 		"model":      originalModel,
 	})
+	if policyErr := r.validateTenantPolicyModel(originalModel, nil, ctx); policyErr != nil {
+		return r.createErrorResponse(422, policyErr.Error()), nil
+	}
 
 	// Reject models that are not configured. Without this guard an unknown
 	// model is forwarded with no resolvable backend credential and surfaces as

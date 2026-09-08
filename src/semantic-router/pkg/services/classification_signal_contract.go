@@ -78,6 +78,7 @@ func (s *ClassificationService) ClassifyIntentForEval(req IntentRequest) (*EvalR
 		decisionResult,
 		intentTokenBound(req.MaxCompletionTokens, req.MaxTokens),
 		intentTokenBound(req.ReasoningBudgetTokens),
+		req.TenantID,
 	)
 	return resp, nil
 }
@@ -88,6 +89,7 @@ func (s *ClassificationService) populateEvalModelSelection(
 	decisionResult *decision.DecisionResult,
 	outputTokenBound int,
 	reasoningTokenBound int,
+	tenantID string,
 ) {
 	if response == nil || decisionResult == nil || decisionResult.Decision == nil {
 		return
@@ -107,6 +109,7 @@ func (s *ClassificationService) populateEvalModelSelection(
 		InputTokenCount:     input.inputTokenFloor,
 		OutputTokenBound:    outputTokenBound,
 		ReasoningTokenBound: reasoningTokenBound,
+		TenantID:            tenantID,
 	})
 	response.SelectedModel = selection.SelectedModel
 	response.SelectionStatus = selection.Status
@@ -114,6 +117,7 @@ func (s *ClassificationService) populateEvalModelSelection(
 	response.SelectionReason = selection.Reason
 	response.Eligibility = selection.Eligibility
 	response.Cost = selection.Cost
+	response.TenantPolicy = selection.TenantPolicy
 	response.Workflow = workflowEvaluation(
 		decisionResult.Decision.Workflow,
 		response.SelectedModel,

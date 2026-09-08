@@ -49,6 +49,16 @@ describe('route inspector API', () => {
             candidate_models: ['niffy-reasoning', 'niffy-general'],
             executes_models: false,
           },
+          tenant_policy: {
+            contract_version: 'vllm-sr/tenant-policy/v1alpha1',
+            policy_version: 'policy-v1',
+            status: 'applied',
+            source: 'default',
+            tenant_present: false,
+            require_tenant: false,
+            allowed_providers: ['mistral', 'openai'],
+            max_estimated_cost: 0.08,
+          },
           signals: { matched: { keywords: ['reasoning_intent'] } },
         }),
         { status: 200, headers: { 'Content-Type': 'application/json' } },
@@ -67,6 +77,7 @@ describe('route inspector API', () => {
     expect(result.workflow?.executes_tools).toBe(false)
     expect(result.resilience?.executes_models).toBe(false)
     expect(result.resilience?.candidate_models).toEqual(['niffy-reasoning', 'niffy-general'])
+    expect(result.tenant_policy?.policy_version).toBe('policy-v1')
     expect(fetchMock).toHaveBeenCalledWith(
       '/api/router/api/v1/route/evaluate?trace=true',
       expect.objectContaining({

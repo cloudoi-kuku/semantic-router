@@ -1792,6 +1792,29 @@ global:
           headers:
             X-Plan: premium
             X-Role: admin
+    tenant_policy:
+      enabled: false
+      version: "example-v1"
+      tenant_id_header: x-authz-tenant-id
+      require_tenant: false
+      currency: USD
+      output_token_bound: 4096
+      reasoning_token_bound: 0
+      require_pricing: true
+      require_current_pricing: true
+      default:
+        allowed_models: []
+        denied_models: []
+        allowed_providers: []
+        denied_providers: []
+        max_estimated_cost: 1.0
+      tenants:
+        restricted:
+          allowed_models: []
+          denied_models: []
+          allowed_providers: []
+          denied_providers: []
+          max_estimated_cost: 0.1
     ratelimit:
       fail_open: false
       providers:

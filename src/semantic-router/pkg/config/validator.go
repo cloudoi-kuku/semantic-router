@@ -22,6 +22,7 @@ var (
 		validateModelPricingContracts,
 		validateRequestBudgetContracts,
 		validateWorkflowContracts,
+		validateTenantPolicyContracts,
 		validateReasoningFamilyContracts,
 		validateGlobalSemanticCacheContracts,
 		validateGlobalMemoryContracts,

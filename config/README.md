@@ -43,6 +43,12 @@ global: {}
 - `global` owns cross-cutting router settings, services, stores, integrations,
   and router-managed model assets.
 
+`global.services.tenant_policy` can apply a versioned, trusted-identity
+allow/deny policy and per-request cost ceiling before model ranking. Provider
+identity comes from `provider:<vendor>` model-card tags, so an OpenAI-compatible
+wire protocol does not collapse distinct vendors into one policy identity. See
+[`tutorials/global/tenant-routing-policy.md`](../website/docs/tutorials/global/tenant-routing-policy.md).
+
 Validate a file before serving it:
 
 ```bash

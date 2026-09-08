@@ -155,3 +155,51 @@ func TestHandleRoutingDecisionReturnsDecisionDiagnosticsOnUnresolvedRoute(t *tes
 		t.Fatalf("missing decision diagnostics: %+v", response)
 	}
 }
+
+func TestHandleStableRoutingDecisionUsesV1ContractAndTrustedTenantHeader(t *testing.T) {
+	const privateTenant = "PRIVATE_TENANT_ID"
+	fakeSvc := &evalCaptureClassificationService{evalResp: &services.EvalResponse{
+		TenantPolicy: &services.TenantPolicyEvaluation{
+			ContractVersion: config.TenantPolicyContractVersion,
+			PolicyVersion:   "policy-v1",
+			Status:          "applied",
+			Source:          "tenant",
+			TenantPresent:   true,
+		},
+	}}
+	server := &ClassificationAPIServer{
+		classificationSvc: fakeSvc,
+		config: &config.RouterConfig{TenantPolicy: config.TenantPolicyConfig{
+			Enabled: true, TenantIDHeader: "x-product-tenant",
+		}},
+	}
+	request := httptest.NewRequest(
+		http.MethodPost,
+		"/v1/route/evaluate",
+		strings.NewReader(`{"text":"hello"}`),
+	)
+	request.Header.Set("x-product-tenant", privateTenant)
+	recorder := httptest.NewRecorder()
+
+	server.handleRoutingDecision(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", recorder.Code, recorder.Body.String())
+	}
+	if fakeSvc.lastEvalReq.TenantID != privateTenant {
+		t.Fatalf("trusted tenant header was not forwarded internally")
+	}
+	if strings.Contains(recorder.Body.String(), privateTenant) {
+		t.Fatalf("response exposed tenant identity: %s", recorder.Body.String())
+	}
+	var response RoutingDecisionEnvelope
+	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
+		t.Fatal(err)
+	}
+	if response.SchemaVersion != stableRoutingDecisionSchemaVersion {
+		t.Fatalf("schema version = %q", response.SchemaVersion)
+	}
+	if response.TenantPolicy == nil || response.TenantPolicy.Status != "applied" {
+		t.Fatalf("tenant evidence = %+v", response.TenantPolicy)
+	}
+}

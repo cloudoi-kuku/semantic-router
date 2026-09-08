@@ -38,7 +38,19 @@ func (r *OpenAIRouter) selectDecisionDefaultRuntimeModel(
 		return "", entropy.ReasoningDecision{}, err
 	}
 	selectedModel := r.Config.DefaultModel
-	if budget := decisionConfig.RequestBudget; budget != nil {
+	resolvedTenant, evidence := r.resolveTenantPolicy(
+		headerValueCI(ctx, r.Config.TenantPolicy.GetTenantIDHeader()),
+	)
+	ctx.VSRTenantPolicy = evidence
+	if tenantEligibility := r.tenantPolicyEligibleModelRefs(
+		[]config.ModelRef{{Model: selectedModel}}, resolvedTenant,
+	); len(tenantEligibility.eligible) == 0 {
+		return "", entropy.ReasoningDecision{}, fmt.Errorf(
+			"%w: configured default model for decision %q failed tenant-policy eligibility",
+			errNoContextEligibleDecisionModel, decisionName,
+		)
+	}
+	if budget := effectiveTenantRequestBudget(decisionConfig.RequestBudget, r.Config.TenantPolicy, resolvedTenant.Policy); budget != nil {
 		budgetResult := r.requestBudgetEligibleModelRefs(
 			[]config.ModelRef{{Model: selectedModel}}, budget,
 			ctx.VSRContextTokenCount, ctx.VSROutputTokenBound, ctx.VSRReasoningTokenBound, time.Now().UTC(),

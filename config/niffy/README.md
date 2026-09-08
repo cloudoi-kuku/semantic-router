@@ -42,14 +42,23 @@ curl http://localhost:8899/v1/chat/completions \
 ```
 
 To inspect the route without generating a provider response, open **Build →
-Outcomes → Route Inspector** in the dashboard. The equivalent direct Router API
-request is:
+Outcomes → Route Inspector** in the dashboard. Products should use the stable
+`/v1/route/evaluate` contract; `/api/v1/route/evaluate` remains available for
+the original `v1alpha1` compatibility contract:
 
 ```bash
-curl 'http://localhost:8080/api/v1/route/evaluate?trace=true' \
+curl 'http://localhost:8080/v1/route/evaluate?trace=true' \
   -H 'Content-Type: application/json' \
   -d '{"model":"niffy/auto","text":"Analyze the trade-offs of this design."}'
 ```
+
+NIFFY-10 adds a trusted tenant-policy stage before capability and economic
+ranking. The default development policy permits the three configured providers
+and caps each request at 0.20 USD. A request carrying
+`x-authz-tenant-id: niffy-economy` cannot use `niffy-reasoning` and has a 0.01
+USD cap. Tenant identity must be stripped and injected by an authenticating
+gateway in a deployed environment; it is never accepted from the JSON body or
+returned in routing evidence.
 
 Explicit keyword matches remain deterministic policy overrides. A local
 embedding signal also recognizes freshness/search paraphrases, and a local
@@ -90,8 +99,27 @@ latency, model attempts, same-model retries, cross-provider fallback, and an
 explicit quality state. Quality is `not_measured` unless an enabled quality
 guard produces evidence; it is never inferred from a successful HTTP status.
 The aggregate replay endpoint summarizes this data under
-`execution_evidence`. The development memory store expires records after seven
-days and is not durable across restarts.
+`execution_evidence`. NIFFY-10 stores replay records and shared startup status
+in separate Redis databases so router-container restarts retain inspection
+data. The seven-day replay TTL remains enforced. Production deployments must
+provide durable Redis storage and authentication appropriate to their trust
+boundary.
+
+Python callers can use the packaged product-neutral client:
+
+```python
+from vllm_sr import SemanticRouterClient
+
+router = SemanticRouterClient(
+    "http://router.internal:8080",
+    token="management-api-token",
+)
+decision = router.evaluate(
+    {"model": "niffy/auto", "text": "Compare these designs."},
+    tenant_id="verified-tenant",
+)
+print(decision.selection.selected_model)
+```
 
 `tool-intent-route` now uses the `vllm-sr/workflow/v1alpha1`
 `web_search_answer` contract. Live requests must arrive with the trusted

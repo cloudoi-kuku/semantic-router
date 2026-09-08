@@ -23,6 +23,26 @@ queries. See [Router management API](./apiserver).
 Other `/v1/*` paths fail closed. In particular, Router Replay paths are not
 available on a public inference listener.
 
+The non-generating `POST /v1/route/evaluate` product contract is served by the
+management listener, not the public inference listener. Calling products can
+use it before inference to inspect the selected decision, model eligibility,
+tenant policy, bounded cost, workflow, and fallback plan.
+
+The Python package exports `SemanticRouterClient` for this contract:
+
+```python
+from vllm_sr import SemanticRouterClient
+
+client = SemanticRouterClient("http://router.internal:8080", token="...")
+decision = client.evaluate(
+    {"model": "auto", "text": "Analyze the design trade-offs."},
+    tenant_id="verified-tenant",
+)
+```
+
+The client rejects alpha or non-dry-run responses instead of silently accepting
+an incompatible contract.
+
 ## Send a routed request
 
 Use an auto-model or recipe entrypoint when you want the router to select a

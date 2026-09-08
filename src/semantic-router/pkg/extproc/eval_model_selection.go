@@ -21,11 +21,14 @@ func (r *OpenAIRouter) SelectModelForEval(
 	if r == nil || r.Config == nil || decision == nil {
 		return evalSelectionUnavailable("router selection runtime is unavailable")
 	}
+	resolvedTenant, tenantEvidence := r.resolveTenantPolicy(input.TenantID)
+	tenantResult := r.tenantPolicyEligibleModelRefs(decision.ModelRefs, resolvedTenant)
 	eligibilityResult := r.eligibleModelRefs(
-		decision.ModelRefs,
+		tenantResult.eligible,
 		decision.RequiredCapabilities,
 		input.ContextTokenCount,
 	)
+	eligibilityResult.exclusions = append(tenantResult.exclusions, eligibilityResult.exclusions...)
 	eligibility := &services.ModelEligibility{
 		CatalogVersion:       config.ModelCapabilityCatalogVersion,
 		RequiredCapabilities: append([]string(nil), decision.RequiredCapabilities...),
@@ -36,6 +39,7 @@ func (r *OpenAIRouter) SelectModelForEval(
 	defer func() {
 		selectionResult.Eligibility = eligibility
 		selectionResult.Cost = cost
+		selectionResult.TenantPolicy = tenantEvidence
 	}()
 	if reason := r.evalExplicitModelIneligibilityReason(decision, input); reason != "" {
 		return evalSelectionUnavailable(reason)
@@ -43,7 +47,7 @@ func (r *OpenAIRouter) SelectModelForEval(
 	eligibleModelRefs := eligibilityResult.eligible
 	budgetResult := r.requestBudgetEligibleModelRefs(
 		eligibleModelRefs,
-		decision.RequestBudget,
+		effectiveTenantRequestBudget(decision.RequestBudget, r.Config.TenantPolicy, resolvedTenant.Policy),
 		input.InputTokenCount,
 		input.OutputTokenBound,
 		input.ReasoningTokenBound,
@@ -54,7 +58,7 @@ func (r *OpenAIRouter) SelectModelForEval(
 	eligibleModelRefs = budgetResult.eligible
 	eligibility.EligibleModels = modelRefNames(eligibleModelRefs)
 	eligibility.ExcludedModels = append(eligibility.ExcludedModels, budgetResult.exclusions...)
-	if reason := evalNoEligibleModelReason(eligibleModelRefs, eligibilityResult, decision.RequestBudget); reason != "" {
+	if reason := evalNoEligibleModelReason(eligibleModelRefs, eligibilityResult, effectiveTenantRequestBudget(decision.RequestBudget, r.Config.TenantPolicy, resolvedTenant.Policy)); reason != "" {
 		return evalSelectionUnavailable(reason)
 	}
 	if len(eligibility.ExcludedModels) > 0 {
@@ -94,7 +98,7 @@ func evalNoEligibleModelReason(
 		return ""
 	}
 	if len(base.exclusions) > 0 {
-		return "no decision model can satisfy context and capability requirements"
+		return "no decision model can satisfy tenant, context, or capability requirements"
 	}
 	if budget != nil {
 		return "no decision model can satisfy the request budget"

@@ -58,6 +58,20 @@ export interface RoutingDecisionResilience {
   executes_models: boolean
 }
 
+export interface RoutingDecisionTenantPolicy {
+  contract_version: string
+  policy_version: string
+  status: string
+  source: string
+  tenant_present: boolean
+  require_tenant: boolean
+  allowed_models?: string[]
+  denied_models?: string[]
+  allowed_providers?: string[]
+  denied_providers?: string[]
+  max_estimated_cost?: number
+}
+
 export interface RoutingDecisionWorkflow {
   contract_version: string
   type: string
@@ -105,6 +119,7 @@ export interface RoutingDecisionEnvelope {
   cost?: RoutingDecisionCost
   workflow?: RoutingDecisionWorkflow
   resilience?: RoutingDecisionResilience
+  tenant_policy?: RoutingDecisionTenantPolicy
   signals: RoutingDecisionSignals
   diagnostics?: {
     signal_errors?: Record<string, string>

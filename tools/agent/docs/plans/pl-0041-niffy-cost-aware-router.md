@@ -65,13 +65,16 @@ workflow decisions.
 - [x] `NIFFY-09` Introduce calibrated local embedding and prototype-complexity
   classifiers while retaining deterministic keyword policy overrides and tool
   priority.
-- [ ] `NIFFY-10` Stabilize the product-facing API and complete tenant policy,
-  SDK, deployment, and compatibility hardening.
+- [x] `NIFFY-10` Stabilize the product-facing API at
+  `POST /v1/route/evaluate`, retain the `v1alpha1` compatibility path, enforce
+  privacy-safe tenant model/provider/cost policy in live and dry-run routing,
+  ship a schema-checking Python client, and move the Niffy replay/startup state
+  to Redis-backed development persistence.
 
 ## Next Action
 
-Complete `NIFFY-10`: stabilize the product-facing API and finish tenant policy,
-SDK, deployment, persistence, and compatibility hardening.
+Run the full NIFFY-10 feature gate and live compatibility matrix, then prepare
+the completed product-independent router changes for review.
 
 ## Operating Rules
 

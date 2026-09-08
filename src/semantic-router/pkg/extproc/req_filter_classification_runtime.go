@@ -244,6 +244,9 @@ func (r *OpenAIRouter) finalizeDecisionEvaluation(
 	}
 
 	if !r.requestModelActsAsAuto(originalModel) {
+		if policyErr := r.validateTenantPolicyModel(originalModel, result.Decision.RequestBudget, ctx); policyErr != nil {
+			return decisionName, evaluationConfidence, reasoningDecision, "", policyErr
+		}
 		logging.ComponentDebugEvent("extproc", "explicit_model_preserved", map[string]interface{}{
 			"request_id":     ctx.RequestID,
 			"original_model": originalModel,
@@ -349,7 +352,7 @@ func (r *OpenAIRouter) selectDecisionRuntimeModel(
 		return "", entropy.ReasoningDecision{}, err
 	}
 	if selectedModelRef == nil {
-		if result.Decision.RequestBudget != nil {
+		if result.Decision.RequestBudget != nil || r.Config.TenantPolicy.Enabled {
 			return "", entropy.ReasoningDecision{}, fmt.Errorf(
 				"%w: selector returned no request-budget-eligible model for decision %q",
 				errNoContextEligibleDecisionModel, decisionName,
@@ -390,6 +393,16 @@ func (r *OpenAIRouter) validateRuntimeExplicitAlgorithmModels(
 	decisionName string,
 	ctx *RequestContext,
 ) error {
+	resolvedTenant, evidence := r.resolveTenantPolicy(
+		headerValueCI(ctx, r.Config.TenantPolicy.GetTenantIDHeader()),
+	)
+	ctx.VSRTenantPolicy = evidence
+	if ineligible := r.tenantPolicyIneligibleAlgorithmModelCount(decisionConfig, resolvedTenant); ineligible > 0 {
+		return fmt.Errorf(
+			"%w: decision %q has %d explicitly configured algorithm model(s) outside tenant policy",
+			errNoContextEligibleDecisionModel, decisionName, ineligible,
+		)
+	}
 	if ineligible := r.contextIneligibleAlgorithmModelCount(decisionConfig, ctx.VSRContextTokenCount); ineligible > 0 {
 		return fmt.Errorf(
 			"%w: decision %q requires %d request tokens but %d explicitly configured algorithm model(s) have smaller context windows",
@@ -402,8 +415,9 @@ func (r *OpenAIRouter) validateRuntimeExplicitAlgorithmModels(
 			errNoContextEligibleDecisionModel, decisionName, ineligible,
 		)
 	}
-	if ineligible := r.requestBudgetIneligibleAlgorithmModelCount(
-		decisionConfig, ctx.VSRContextTokenCount, ctx.VSROutputTokenBound, ctx.VSRReasoningTokenBound, time.Now().UTC(),
+	if ineligible := r.requestBudgetIneligibleAlgorithmModelCountWithBudget(
+		decisionConfig, effectiveTenantRequestBudget(decisionConfig.RequestBudget, r.Config.TenantPolicy, resolvedTenant.Policy),
+		ctx.VSRContextTokenCount, ctx.VSROutputTokenBound, ctx.VSRReasoningTokenBound, time.Now().UTC(),
 	); ineligible > 0 {
 		return fmt.Errorf(
 			"%w: decision %q has %d explicitly configured algorithm model(s) outside the request budget",

@@ -18,6 +18,7 @@ import type {
   RouterReplayConfig,
   SemanticCacheConfig,
   ToolIntegrationConfig,
+  TenantPolicyConfig,
   VectorStoreConfig,
 } from './configPageSupport'
 
@@ -26,6 +27,7 @@ export const PYTHON_ROUTER_KEYS: RouterSystemKey[] = [
   'response_api',
   'router_replay',
   'authz',
+  'tenant_policy',
   'ratelimit',
   'memory',
   'response_cache',
@@ -81,6 +83,19 @@ export const DEFAULT_SECTIONS: Record<RouterSystemKey, unknown> = {
     },
     providers: [],
   } satisfies AuthzConfig,
+  tenant_policy: {
+    enabled: false,
+    version: 'v1',
+    tenant_id_header: 'x-authz-tenant-id',
+    require_tenant: false,
+    currency: 'USD',
+    output_token_bound: 4096,
+    reasoning_token_bound: 0,
+    require_pricing: true,
+    require_current_pricing: true,
+    default: {},
+    tenants: {},
+  } satisfies TenantPolicyConfig,
   ratelimit: {
     fail_open: false,
     providers: [],
@@ -283,6 +298,12 @@ export const SECTION_META: Record<
     title: 'Authorization',
     eyebrow: 'Services',
     description: 'Header identity extraction and external authorization provider wiring.',
+  },
+  tenant_policy: {
+    title: 'Tenant Policy',
+    eyebrow: 'Services',
+    description:
+      'Trusted tenant identity, model/provider allowlists, and per-request cost ceilings.',
   },
   ratelimit: {
     title: 'Rate Limiting',

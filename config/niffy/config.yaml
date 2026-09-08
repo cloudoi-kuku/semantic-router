@@ -12,9 +12,37 @@ global:
   services:
     router_replay:
       enabled: true
-      store_backend: memory
+      store_backend: redis
       ttl_seconds: 604800
-      async_writes: false
+      async_writes: true
+      redis:
+        address: vllm-sr-redis:6379
+        db: 2
+        max_retries: 3
+        pool_size: 10
+        key_prefix: "niffy:replay:"
+    startup_status:
+      store_backend: redis
+      redis:
+        address: vllm-sr-redis:6379
+        db: 3
+    tenant_policy:
+      enabled: true
+      version: "2026-09-08"
+      tenant_id_header: x-authz-tenant-id
+      require_tenant: false
+      currency: USD
+      output_token_bound: 4096
+      reasoning_token_bound: 8192
+      require_pricing: true
+      require_current_pricing: true
+      default:
+        allowed_providers: [mistral, xai, openai]
+        max_estimated_cost: 0.20
+      tenants:
+        niffy-economy:
+          denied_models: [niffy-reasoning]
+          max_estimated_cost: 0.01
   model_catalog:
     embeddings:
       semantic:

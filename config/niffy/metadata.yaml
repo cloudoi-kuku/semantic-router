@@ -1,7 +1,7 @@
 schema_version: vllm-sr/recipe-metadata/v1
 id: niffy
 name: Niffy Cost-Aware Routing
-version: 0.2.0
+version: 0.3.0
 description: >-
   Routes routine requests to an economical model, explicit or semantic search
   intent to a general model, and locally classified reasoning demand to a
@@ -16,5 +16,6 @@ tags:
   - tools
   - semantic-routing
   - observability
+  - tenant-policy
 links:
   source: https://github.com/vllm-project/semantic-router

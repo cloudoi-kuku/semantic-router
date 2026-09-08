@@ -11,22 +11,26 @@ import (
 	"github.com/vllm-project/semantic-router/src/semantic-router/pkg/services"
 )
 
-const routingDecisionSchemaVersion = "vllm-sr/routing-decision/v1alpha1"
+const (
+	routingDecisionSchemaVersion       = "vllm-sr/routing-decision/v1alpha1"
+	stableRoutingDecisionSchemaVersion = "vllm-sr/routing-decision/v1"
+)
 
 // RoutingDecisionEnvelope is the privacy-minimized, non-generating routing
 // preview returned to products integrating with the Router.
 type RoutingDecisionEnvelope struct {
-	SchemaVersion string                          `json:"schema_version"`
-	DryRun        bool                            `json:"dry_run"`
-	Route         RoutingDecisionRoute            `json:"route"`
-	Selection     RoutingDecisionSelection        `json:"selection"`
-	Eligibility   *services.ModelEligibility      `json:"eligibility,omitempty"`
-	Cost          *services.RequestCostEvaluation `json:"cost,omitempty"`
-	Workflow      *services.WorkflowEvaluation    `json:"workflow,omitempty"`
-	Resilience    *services.ResilienceEvaluation  `json:"resilience,omitempty"`
-	Signals       RoutingDecisionSignals          `json:"signals"`
-	Diagnostics   RoutingDecisionDiagnostics      `json:"diagnostics,omitempty"`
-	Trace         []decision.DecisionTrace        `json:"trace,omitempty"`
+	SchemaVersion string                           `json:"schema_version"`
+	DryRun        bool                             `json:"dry_run"`
+	Route         RoutingDecisionRoute             `json:"route"`
+	Selection     RoutingDecisionSelection         `json:"selection"`
+	Eligibility   *services.ModelEligibility       `json:"eligibility,omitempty"`
+	Cost          *services.RequestCostEvaluation  `json:"cost,omitempty"`
+	Workflow      *services.WorkflowEvaluation     `json:"workflow,omitempty"`
+	Resilience    *services.ResilienceEvaluation   `json:"resilience,omitempty"`
+	TenantPolicy  *services.TenantPolicyEvaluation `json:"tenant_policy,omitempty"`
+	Signals       RoutingDecisionSignals           `json:"signals"`
+	Diagnostics   RoutingDecisionDiagnostics       `json:"diagnostics,omitempty"`
+	Trace         []decision.DecisionTrace         `json:"trace,omitempty"`
 }
 
 type RoutingDecisionRoute struct {
@@ -75,6 +79,9 @@ func (s *ClassificationAPIServer) handleRoutingDecision(w http.ResponseWriter, r
 	if r.URL.Query().Get("trace") == "true" {
 		req.Options.Trace = true
 	}
+	if cfg := s.currentConfig(); cfg != nil && cfg.TenantPolicy.Enabled {
+		req.TenantID = r.Header.Get(cfg.TenantPolicy.GetTenantIDHeader())
+	}
 
 	evaluated, err := s.classificationSvc.ClassifyIntentForEval(req)
 	if evaluated != nil {
@@ -82,7 +89,7 @@ func (s *ClassificationAPIServer) handleRoutingDecision(w http.ResponseWriter, r
 		if err != nil {
 			status = http.StatusServiceUnavailable
 		}
-		s.writeJSONResponse(w, status, newRoutingDecisionEnvelope(evaluated))
+		s.writeJSONResponse(w, status, newRoutingDecisionEnvelope(evaluated, routingDecisionSchemaForPath(r.URL.Path)))
 		return
 	}
 	if err != nil {
@@ -98,9 +105,9 @@ func (s *ClassificationAPIServer) handleRoutingDecision(w http.ResponseWriter, r
 	)
 }
 
-func newRoutingDecisionEnvelope(evaluated *services.EvalResponse) RoutingDecisionEnvelope {
+func newRoutingDecisionEnvelope(evaluated *services.EvalResponse, schemaVersion string) RoutingDecisionEnvelope {
 	envelope := RoutingDecisionEnvelope{
-		SchemaVersion: routingDecisionSchemaVersion,
+		SchemaVersion: schemaVersion,
 		DryRun:        true,
 		Route: RoutingDecisionRoute{
 			Recipe: evaluated.Recipe,
@@ -112,10 +119,11 @@ func newRoutingDecisionEnvelope(evaluated *services.EvalResponse) RoutingDecisio
 			CandidateModels: append([]string(nil), evaluated.RecommendedModels...),
 			Reason:          evaluated.SelectionReason,
 		},
-		Eligibility: evaluated.Eligibility,
-		Cost:        evaluated.Cost,
-		Workflow:    evaluated.Workflow,
-		Resilience:  evaluated.Resilience,
+		Eligibility:  evaluated.Eligibility,
+		Cost:         evaluated.Cost,
+		Workflow:     evaluated.Workflow,
+		Resilience:   evaluated.Resilience,
+		TenantPolicy: evaluated.TenantPolicy,
 		Signals: RoutingDecisionSignals{
 			Confidences: evaluated.SignalConfidences,
 			Values:      evaluated.SignalValues,
@@ -136,4 +144,11 @@ func newRoutingDecisionEnvelope(evaluated *services.EvalResponse) RoutingDecisio
 		envelope.Signals.Unmatched = evaluated.DecisionResult.UnmatchedSignals
 	}
 	return envelope
+}
+
+func routingDecisionSchemaForPath(path string) string {
+	if path == "/v1/route/evaluate" {
+		return stableRoutingDecisionSchemaVersion
+	}
+	return routingDecisionSchemaVersion
 }

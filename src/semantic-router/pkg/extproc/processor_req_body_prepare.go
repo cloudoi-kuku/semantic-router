@@ -44,6 +44,12 @@ func (r *OpenAIRouter) runRequestPreRoutingStages(
 	populatePinnedSessionFromHeaders(ctx)
 	history := signalConversationHistoryFromSnapshot(snapshot)
 	applyRequestContextEstimate(snapshot, ctx)
+	if !r.requestModelActsAsAuto(originalModel) {
+		if policyErr := r.validateTenantPolicyModel(originalModel, nil, ctx); policyErr != nil {
+			logging.Warnf("[Request Body] Explicit model failed tenant policy: %v", policyErr)
+			return requestDecisionState{}, r.createErrorResponse(422, policyErr.Error())
+		}
+	}
 	decisionName, _, reasoningDecision, selectedModel, decisionErr := r.performDecisionEvaluation(
 		originalModel,
 		history,

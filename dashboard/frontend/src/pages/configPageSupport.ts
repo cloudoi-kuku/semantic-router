@@ -560,6 +560,28 @@ export interface AuthzConfig {
   providers?: AuthzProviderConfig[]
 }
 
+export interface TenantRoutingPolicy {
+  allowed_models?: string[]
+  denied_models?: string[]
+  allowed_providers?: string[]
+  denied_providers?: string[]
+  max_estimated_cost?: number
+}
+
+export interface TenantPolicyConfig {
+  enabled?: boolean
+  version?: string
+  tenant_id_header?: string
+  require_tenant?: boolean
+  currency?: string
+  output_token_bound?: number
+  reasoning_token_bound?: number
+  require_pricing?: boolean
+  require_current_pricing?: boolean
+  default?: TenantRoutingPolicy
+  tenants?: Record<string, TenantRoutingPolicy>
+}
+
 export interface RateLimitMatch {
   user?: string
   group?: string
@@ -781,6 +803,7 @@ export interface CanonicalServiceGlobalConfig {
   response_api?: ResponseAPIConfig
   observability?: ObservabilityConfig
   authz?: AuthzConfig
+  tenant_policy?: TenantPolicyConfig
   ratelimit?: RateLimitConfig
   router_replay?: RouterReplayConfig
 }

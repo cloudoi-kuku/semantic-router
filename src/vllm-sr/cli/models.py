@@ -1563,6 +1563,78 @@ class RequestBudget(BaseModel):
         return self
 
 
+class TenantRoutingPolicyConfig(BaseModel):
+    """Provider-neutral model and cost constraints for one tenant."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    allowed_models: List[str] = Field(default_factory=list)
+    denied_models: List[str] = Field(default_factory=list)
+    allowed_providers: List[str] = Field(default_factory=list)
+    denied_providers: List[str] = Field(default_factory=list)
+    max_estimated_cost: Optional[float] = Field(default=None, gt=0, allow_inf_nan=False)
+
+    @model_validator(mode="after")
+    def validate_disjoint_constraints(self):
+        if any(not value.strip() for value in self.allowed_models + self.denied_models):
+            raise ValueError("model identifiers cannot be empty")
+        if any(
+            not value.strip()
+            for value in self.allowed_providers + self.denied_providers
+        ):
+            raise ValueError("provider identifiers cannot be empty")
+        model_overlap = {value.strip().lower() for value in self.allowed_models} & {
+            value.strip().lower() for value in self.denied_models
+        }
+        if model_overlap:
+            raise ValueError("a model cannot be both allowed and denied")
+        provider_overlap = {
+            value.strip().lower() for value in self.allowed_providers
+        } & {value.strip().lower() for value in self.denied_providers}
+        if provider_overlap:
+            raise ValueError("a provider cannot be both allowed and denied")
+        return self
+
+
+class TenantPolicyConfig(BaseModel):
+    """Trusted tenant identity and routing-policy catalogue."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    enabled: bool = False
+    version: Optional[str] = None
+    tenant_id_header: str = "x-authz-tenant-id"
+    require_tenant: bool = False
+    currency: str = Field(default="USD", pattern=r"^[A-Z]{3}$")
+    output_token_bound: int = Field(default=4096, gt=0)
+    reasoning_token_bound: int = Field(default=0, ge=0)
+    require_pricing: bool = True
+    require_current_pricing: bool = True
+    default: TenantRoutingPolicyConfig = Field(
+        default_factory=TenantRoutingPolicyConfig
+    )
+    tenants: Dict[str, TenantRoutingPolicyConfig] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def validate_enabled_contract(self):
+        if self.enabled and not (self.version or "").strip():
+            raise ValueError("version is required when tenant policy is enabled")
+        if not self.tenant_id_header.strip():
+            raise ValueError("tenant_id_header cannot be empty")
+        if any(not tenant_id.strip() for tenant_id in self.tenants):
+            raise ValueError("tenant identifiers cannot be empty")
+        if self.require_current_pricing and not self.require_pricing:
+            raise ValueError("require_current_pricing requires require_pricing")
+        has_cost_cap = self.default.max_estimated_cost is not None or any(
+            tenant.max_estimated_cost is not None for tenant in self.tenants.values()
+        )
+        if has_cost_cap and not self.require_pricing:
+            raise ValueError(
+                "require_pricing must be true when a cost cap is configured"
+            )
+        return self
+
+
 class WebSearchWorkflow(BaseModel):
     """Bounded SearXNG adapter configuration for web-search evidence."""
 

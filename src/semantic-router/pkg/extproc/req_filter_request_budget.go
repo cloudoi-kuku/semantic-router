@@ -25,8 +25,12 @@ func (r *OpenAIRouter) applyRuntimeRequestBudget(
 	if decision == nil {
 		return refs, nil
 	}
+	resolvedTenant, evidence := r.resolveTenantPolicy(
+		headerValueCI(ctx, r.Config.TenantPolicy.GetTenantIDHeader()),
+	)
+	ctx.VSRTenantPolicy = evidence
 	result := r.requestBudgetEligibleModelRefs(
-		refs, decision.RequestBudget, ctx.VSRContextTokenCount,
+		refs, effectiveTenantRequestBudget(decision.RequestBudget, r.Config.TenantPolicy, resolvedTenant.Policy), ctx.VSRContextTokenCount,
 		ctx.VSROutputTokenBound, ctx.VSRReasoningTokenBound, time.Now().UTC(),
 	)
 	result = r.boundFallbackChain(result, decision)
@@ -220,7 +224,20 @@ func (r *OpenAIRouter) requestBudgetIneligibleAlgorithmModelCount(
 	reasoningTokens int,
 	now time.Time,
 ) int {
-	if decision == nil || decision.Algorithm == nil || decision.RequestBudget == nil {
+	return r.requestBudgetIneligibleAlgorithmModelCountWithBudget(
+		decision, decision.RequestBudget, inputTokens, outputTokens, reasoningTokens, now,
+	)
+}
+
+func (r *OpenAIRouter) requestBudgetIneligibleAlgorithmModelCountWithBudget(
+	decision *config.Decision,
+	budget *config.RequestBudget,
+	inputTokens int,
+	outputTokens int,
+	reasoningTokens int,
+	now time.Time,
+) int {
+	if decision == nil || decision.Algorithm == nil || budget == nil {
 		return 0
 	}
 	seen := map[string]struct{}{}
@@ -235,7 +252,7 @@ func (r *OpenAIRouter) requestBudgetIneligibleAlgorithmModelCount(
 		}
 		seen[model] = struct{}{}
 		result := r.requestBudgetEligibleModelRefs(
-			[]config.ModelRef{{Model: model}}, decision.RequestBudget,
+			[]config.ModelRef{{Model: model}}, budget,
 			inputTokens, outputTokens, reasoningTokens, now,
 		)
 		if len(result.eligible) == 0 {

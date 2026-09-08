@@ -21,6 +21,7 @@ export type RouterSystemKey =
   | 'response_api'
   | 'router_replay'
   | 'authz'
+  | 'tenant_policy'
   | 'ratelimit'
   | 'memory'
   | 'response_cache'
@@ -114,6 +115,7 @@ const GLOBAL_SECTION_PATHS: Record<RouterSystemKey, string[]> = {
   response_api: ['services', 'response_api'],
   router_replay: ['services', 'router_replay'],
   authz: ['services', 'authz'],
+  tenant_policy: ['services', 'tenant_policy'],
   ratelimit: ['services', 'ratelimit'],
   memory: ['stores', 'memory'],
   response_cache: ['stores', 'response_cache'],
@@ -140,6 +142,7 @@ const ROUTER_SECTION_LAYERS: Record<RouterSystemKey, RouterLayerKey> = {
   response_api: 'services',
   router_replay: 'services',
   authz: 'services',
+  tenant_policy: 'services',
   ratelimit: 'services',
   memory: 'stores',
   response_cache: 'stores',
@@ -334,6 +337,13 @@ function summaryForKey(key: RouterSystemKey, data: unknown): RouterSectionSummar
           value: stringOrFallback(asObject(section?.identity)?.user_id_header, 'x-authz-user-id'),
         },
         { label: 'Providers', value: `${(asArray(section?.providers) || []).length}` },
+      ]
+    case 'tenant_policy':
+      return [
+        { label: 'Enabled', value: stringOrFallback(section?.enabled, 'Disabled') },
+        { label: 'Version', value: stringOrFallback(section?.version) },
+        { label: 'Tenant required', value: stringOrFallback(section?.require_tenant, 'Disabled') },
+        { label: 'Overrides', value: `${Object.keys(asObject(section?.tenants) || {}).length}` },
       ]
     case 'ratelimit':
       return [
@@ -655,6 +665,24 @@ function fieldsForKey(key: RouterSystemKey): FieldConfig[] {
         routerStructuredField(key, 'identity'),
         routerStructuredField(key, 'providers'),
       ]
+    case 'tenant_policy':
+      return [
+        { name: 'enabled', label: 'Enable Tenant Policy', type: 'boolean' },
+        { name: 'version', label: 'Policy Version', type: 'text', required: true },
+        {
+          name: 'tenant_id_header',
+          label: 'Trusted Tenant ID Header',
+          type: 'text',
+          required: true,
+        },
+        { name: 'require_tenant', label: 'Require Tenant Identity', type: 'boolean' },
+        { name: 'currency', label: 'Budget Currency', type: 'text', required: true },
+        { name: 'output_token_bound', label: 'Default Output Token Bound', type: 'number' },
+        { name: 'reasoning_token_bound', label: 'Default Reasoning Token Bound', type: 'number' },
+        { name: 'require_pricing', label: 'Require Pricing', type: 'boolean' },
+        { name: 'require_current_pricing', label: 'Require Current Pricing', type: 'boolean' },
+        routerStructuredField(key, 'default'),
+      ]
     case 'ratelimit':
       return [
         { name: 'fail_open', label: 'Fail Open', type: 'boolean' },
@@ -758,7 +786,12 @@ function fieldsForKey(key: RouterSystemKey): FieldConfig[] {
           placeholder: '384',
         },
         { name: 'ingestion_workers', label: 'Ingestion Workers', type: 'number', placeholder: '2' },
-        { name: 'ingestion_drain_timeout_seconds', label: 'Ingestion Drain Timeout (s)', type: 'number', placeholder: '25' },
+        {
+          name: 'ingestion_drain_timeout_seconds',
+          label: 'Ingestion Drain Timeout (s)',
+          type: 'number',
+          placeholder: '25',
+        },
         routerStructuredField(key, 'supported_formats'),
         routerStructuredField(key, 'memory'),
         routerStructuredField(key, 'milvus'),
@@ -1178,6 +1211,8 @@ export function buildEffectiveRouterConfig(
     router_replay:
       getSectionValue(routerDefaults, 'router_replay') ?? getSectionValue(config, 'router_replay'),
     authz: getSectionValue(routerDefaults, 'authz') ?? getSectionValue(config, 'authz'),
+    tenant_policy:
+      getSectionValue(routerDefaults, 'tenant_policy') ?? getSectionValue(config, 'tenant_policy'),
     ratelimit: getSectionValue(routerDefaults, 'ratelimit') ?? getSectionValue(config, 'ratelimit'),
     memory: getSectionValue(routerDefaults, 'memory') ?? getSectionValue(config, 'memory'),
     response_cache:

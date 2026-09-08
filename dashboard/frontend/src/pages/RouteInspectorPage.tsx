@@ -155,6 +155,27 @@ const RouteInspectorPage: React.FC = () => {
                 </div>
               ) : null}
 
+              {result.tenant_policy ? (
+                <div className={styles.signalSection}>
+                  <h3>Tenant policy</h3>
+                  <p className={styles.muted}>
+                    {result.tenant_policy.contract_version} · policy{' '}
+                    {result.tenant_policy.policy_version || 'unversioned'}
+                  </p>
+                  <p>
+                    Status: {result.tenant_policy.status}; source: {result.tenant_policy.source};
+                    trusted tenant identity:{' '}
+                    {result.tenant_policy.tenant_present ? 'present' : 'absent'}.
+                  </p>
+                  <p className={styles.muted}>
+                    Allowed providers:{' '}
+                    {(result.tenant_policy.allowed_providers || []).join(', ') || 'all'}; maximum
+                    estimated cost:{' '}
+                    {result.tenant_policy.max_estimated_cost?.toFixed(6) ?? 'decision default'}.
+                  </p>
+                </div>
+              ) : null}
+
               {result.eligibility ? (
                 <div className={styles.signalSection}>
                   <h3>Model eligibility</h3>

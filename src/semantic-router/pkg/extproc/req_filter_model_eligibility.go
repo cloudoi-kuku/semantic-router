@@ -80,10 +80,15 @@ func (r *OpenAIRouter) contextEligibleDecisionModelRefs(
 	contextTokens int,
 	ctx *RequestContext,
 ) ([]config.ModelRef, error) {
-	result := r.eligibleModelRefs(refs, requiredCapabilities, contextTokens)
+	tenantID := headerValueCI(ctx, r.Config.TenantPolicy.GetTenantIDHeader())
+	resolvedTenant, tenantEvidence := r.resolveTenantPolicy(tenantID)
+	ctx.VSRTenantPolicy = tenantEvidence
+	tenantResult := r.tenantPolicyEligibleModelRefs(refs, resolvedTenant)
+	result := r.eligibleModelRefs(tenantResult.eligible, requiredCapabilities, contextTokens)
+	result.exclusions = append(tenantResult.exclusions, result.exclusions...)
 	if len(result.eligible) == 0 && len(result.exclusions) > 0 {
 		return nil, fmt.Errorf(
-			"%w: every configured candidate for decision %q failed context or capability eligibility",
+			"%w: every configured candidate for decision %q failed tenant, context, or capability eligibility",
 			errNoContextEligibleDecisionModel,
 			decisionName,
 		)
@@ -124,8 +129,15 @@ func (r *OpenAIRouter) decisionRouteActionDestination(
 	if destination == "" {
 		return "", false, nil
 	}
+	resolvedTenant, evidence := r.resolveTenantPolicy(
+		headerValueCI(ctx, r.Config.TenantPolicy.GetTenantIDHeader()),
+	)
+	ctx.VSRTenantPolicy = evidence
+	destinationTenant := r.tenantPolicyEligibleModelRefs(
+		[]config.ModelRef{{Model: destination}}, resolvedTenant,
+	)
 	destinationBudget := r.requestBudgetEligibleModelRefs(
-		[]config.ModelRef{{Model: destination}}, decision.RequestBudget,
+		destinationTenant.eligible, effectiveTenantRequestBudget(decision.RequestBudget, r.Config.TenantPolicy, resolvedTenant.Policy),
 		ctx.VSRContextTokenCount, ctx.VSROutputTokenBound, ctx.VSRReasoningTokenBound, time.Now().UTC(),
 	)
 	if !r.modelNameExceedsContextWindow(destination, ctx.VSRContextTokenCount) &&
@@ -138,13 +150,14 @@ func (r *OpenAIRouter) decisionRouteActionDestination(
 		})
 		return destination, true, nil
 	}
+	tenantEligibility := r.tenantPolicyEligibleModelRefs(decision.ModelRefs, resolvedTenant)
 	eligibility := r.eligibleModelRefs(
-		decision.ModelRefs,
+		tenantEligibility.eligible,
 		decision.RequiredCapabilities,
 		ctx.VSRContextTokenCount,
 	)
 	budgetEligibility := r.requestBudgetEligibleModelRefs(
-		eligibility.eligible, decision.RequestBudget,
+		eligibility.eligible, effectiveTenantRequestBudget(decision.RequestBudget, r.Config.TenantPolicy, resolvedTenant.Policy),
 		ctx.VSRContextTokenCount, ctx.VSROutputTokenBound, ctx.VSRReasoningTokenBound, time.Now().UTC(),
 	)
 	eligibility.eligible = budgetEligibility.eligible

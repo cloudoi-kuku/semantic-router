@@ -46,6 +46,7 @@ type CanonicalServiceGlobal struct {
 	Observability ObservabilityConfig `yaml:"observability"`
 	Authz         AuthzConfig         `yaml:"authz"`
 	RateLimit     RateLimitConfig     `yaml:"ratelimit"`
+	TenantPolicy  TenantPolicyConfig  `yaml:"tenant_policy"`
 	ManagementAPI ManagementAPIConfig `yaml:"management_api"`
 	RouterReplay  RouterReplayConfig  `yaml:"router_replay"`
 	StartupStatus StartupStatusConfig `yaml:"startup_status"`
@@ -309,6 +310,7 @@ func applyCanonicalGlobal(cfg *RouterConfig, global *CanonicalGlobal) error {
 	cfg.Observability = global.Services.Observability
 	cfg.Authz = global.Services.Authz
 	cfg.RateLimit = global.Services.RateLimit
+	cfg.TenantPolicy = global.Services.TenantPolicy
 	cfg.ManagementAPI = global.Services.ManagementAPI
 	cfg.RouterReplay = global.Services.RouterReplay
 	cfg.StartupStatus = global.Services.StartupStatus

@@ -56,6 +56,7 @@ func TestPopulateEvalModelSelectionReturnsConcreteRuntimeChoice(t *testing.T) {
 		},
 		0,
 		0,
+		"",
 	)
 	assertConcreteRuntimeChoice(t, selector, response, matchedDecision)
 }
@@ -129,6 +130,7 @@ func TestPopulateEvalModelSelectionDoesNotInventFirstRecommendedModel(t *testing
 		}},
 		0,
 		0,
+		"",
 	)
 
 	if response.SelectedModel != "" || response.SelectionStatus != EvalSelectionUnavailable {

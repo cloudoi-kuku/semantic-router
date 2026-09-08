@@ -32,6 +32,9 @@ type IntentRequest struct {
 	Model                 string            `json:"model,omitempty"`
 	Metadata              map[string]string `json:"metadata,omitempty"`
 	Options               *IntentOptions    `json:"options,omitempty"`
+	// TenantID is populated only from a trusted request header by the product
+	// routing endpoint. It is never decoded from JSON or returned to callers.
+	TenantID string `json:"-"`
 }
 
 // IntentOptions contains options for intent classification.
@@ -102,6 +105,7 @@ type EvalResponse struct {
 	Cost                   *RequestCostEvaluation                  `json:"cost,omitempty"`
 	Workflow               *WorkflowEvaluation                     `json:"workflow,omitempty"`
 	Resilience             *ResilienceEvaluation                   `json:"resilience,omitempty"`
+	TenantPolicy           *TenantPolicyEvaluation                 `json:"tenant_policy,omitempty"`
 	RoutingDecision        string                                  `json:"routing_decision,omitempty"`
 	Metrics                *classification.SignalMetricsCollection `json:"metrics"`                      // Performance and confidence for each signal
 	SignalConfidences      map[string]float64                      `json:"signal_confidences,omitempty"` // Real ML confidence scores per signal, e.g. "domain:economics" -> 0.81
@@ -166,6 +170,23 @@ type ModelEligibilityExclusion struct {
 	MissingCapabilities []string `json:"missing_capabilities,omitempty"`
 }
 
+// TenantPolicyEvaluation is privacy-safe evidence that tenant policy was
+// considered. It intentionally excludes the tenant identifier and configured
+// tenant-map keys.
+type TenantPolicyEvaluation struct {
+	ContractVersion  string   `json:"contract_version"`
+	PolicyVersion    string   `json:"policy_version"`
+	Status           string   `json:"status"`
+	Source           string   `json:"source"`
+	TenantPresent    bool     `json:"tenant_present"`
+	RequireTenant    bool     `json:"require_tenant"`
+	AllowedModels    []string `json:"allowed_models,omitempty"`
+	DeniedModels     []string `json:"denied_models,omitempty"`
+	AllowedProviders []string `json:"allowed_providers,omitempty"`
+	DeniedProviders  []string `json:"denied_providers,omitempty"`
+	MaxEstimatedCost *float64 `json:"max_estimated_cost,omitempty"`
+}
+
 // RequestCostEvaluation is a privacy-safe pre-execution estimate. It contains
 // token bounds and configured prices only, never provider-reported actual cost.
 type RequestCostEvaluation struct {
@@ -203,6 +224,7 @@ type EvalModelSelectionInput struct {
 	InputTokenCount     int
 	OutputTokenBound    int
 	ReasoningTokenBound int
+	TenantID            string
 }
 
 type EvalModelSelection struct {
@@ -212,6 +234,7 @@ type EvalModelSelection struct {
 	Reason        string
 	Eligibility   *ModelEligibility
 	Cost          *RequestCostEvaluation
+	TenantPolicy  *TenantPolicyEvaluation
 }
 
 // EvalModelSelector performs a non-generating selection preview with the same

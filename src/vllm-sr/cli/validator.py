@@ -40,6 +40,7 @@ from cli.validator_workflows import (
     validate_workflow_final_model,
 )
 from cli.validator_signal_references import validate_signal_references
+from cli.validator_tenant_policy import validate_tenant_policy
 
 log = get_logger(__name__)
 
@@ -703,6 +704,8 @@ def validate_user_config(
     errors = []
 
     errors.extend(validate_recipe_contracts(config))
+
+    errors.extend(validate_tenant_policy(config))
 
     # Validate signal references
     errors.extend(validate_signal_references(config))
